@@ -1,0 +1,42 @@
+This project contains the skeleton for a pico-8 game.  It includes
+a placeholder for a top-level controller class as well as a title screen
+and a game screen.  It estsablishes the conventions I'd like to follow
+for object-oriented style programming in lua of coarse-grained objects
+(such as screens).
+
+
+I'd like to build on this skeleton by developing a game like the old
+Atari Asertoids arcade game.  I'd like all of the graphics to be drawn 
+geometrically with the line and circle functions.
+
+The player controls a spaceship that is represented by an isocoles 
+triangle.  The 'nose' of the triangle should be a 30 degree angle.
+When the player presses the left or right button, the ship rotates 5 degrees
+to the left or right.  When the player pushes the x button, this is applies
+thrust to the ship - it gets forward momentum at the rate of 5px per second
+and which decays at the rate of 1px per second if the thrust button is
+released. 
+
+Pressing the O button causes the player's ship to fire small 
+projectiles in a straight line from the nose of the ship which travel for 64
+pixels at the rate of 10 pixels per second.  After that, they disappear from play.
+
+The game should randomly materialize asteroids across the playfield 
+which move along random vectors at speeds ranging from 1 to 5px per second.
+There are three sizes of asteroids, large medium and small.  Asteroids should
+be drawn as circles using the circle funcion.  A large asteroid is 16px in diamter, 
+a medium is 12 and a small is 8.
+
+If the player's shot collides with an asteroid, it is replaced by two asteroids
+of the next smaller size, moving again on a random vector.  If a small asteroid
+is hit by a shot, it is removed from play.
+
+If the player's ship collides with an asteroid, it is destroyed and the game
+returns to the title screen.
+
+The player receives points for destroying asteroids - 10 for a large, 20 for a medium
+and 30 for a small.  The score is displayed in the upper right corner of the screen.
+
+
+All of the game logic should be implemented in the update and draw functions
+of GameScreen.lua.
