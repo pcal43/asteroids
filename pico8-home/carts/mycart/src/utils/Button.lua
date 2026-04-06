@@ -16,3 +16,9 @@ function buttonWasPressed(button)
 	BUTTON_PREVIOUS_STATE[button] = buttonState
 	return pressed
 end
+
+function waitForButtonPress(button)
+	while not (buttonWasPressed(button)) do
+		yield()
+	end
+end

@@ -4,7 +4,6 @@ set export
 
 PROJECT_NAME := env("PROJECT_NAME")
 VERSION := env("VERSION")
-
 ROOT_DIR := "."
 BUILD_DIR := ROOT_DIR + "/build"
 PICO8_HOME := ROOT_DIR + "/pico8-home"
@@ -26,6 +25,9 @@ PICO8_BIN := if UNAME_S == "Darwin" {
 
 clean:
     rm -rf "$BUILD_DIR"
+
+run:
+	"$PICO8_BIN" -home "$PICO8_HOME"  -root_path  "$PICO8_CARTS" -run "$GAME_CART"
 
 version:
     mkdir -p "$GAME_ROOT"

@@ -1,14 +1,29 @@
-local currentScreen = nil
 
-function init()
+-- top-level controller, manages overall flow of the game between screens
+
+local currentScreen = nil
+local flow = nil
+
+function _init()
+	flow = cocreate(function()
+		while true do
+			currentScreen = TitleScreen.new()
+			while not currentScreen.isDone do
+				yield()
+			end
+			currentScreen = GameScreen.new()
+			while not currentScreen.isDone do
+				yield()
+			end
+		end
+	end)	
 end
 
-function update()
-		if (self.currentScreen) self.currentScreen:update()
-		Coroutine.resume(self.flow)
+function _update()
+	if (currentScreen) currentScreen:update()
+	assert(coresume(flow))
 end
     
-function draw()
-	if (self.currentScreen) self.currentScreen:draw()
+function _draw()
+	if (currentScreen) currentScreen:draw()
 end
-

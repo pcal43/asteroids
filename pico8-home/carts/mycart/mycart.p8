@@ -12,19 +12,3 @@ __lua__
 #include src/TitleScreen.lua
 #include src/GameScreen.lua
 #include src/Controller.lua
-
-
-CONTROLLER = Controller.new()
-
-
-function _init()
-    CONTROLLER.init()
-end
-
-function _update()
-    CONTROLLER.update()
-end
-
-function _draw()
-    CONTROLLER.draw()
-end
