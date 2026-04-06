@@ -4,25 +4,35 @@ and a game screen.  It estsablishes the conventions I'd like to follow
 for object-oriented style programming in lua of coarse-grained objects
 (such as screens).
 
-
 I'd like to build on this skeleton by developing a game like the old
 Atari Asertoids arcade game.  I'd like all of the graphics to be drawn 
 geometrically with the line and circle functions.
 
-The player controls a spaceship that is represented by an isocoles 
-triangle.  The 'nose' of the triangle should be a 30 degree angle.
-When the player presses the left or right button, the ship rotates 5 degrees
-to the left or right.  When the player pushes the x button, this is applies
-thrust to the ship - it gets forward momentum at the rate of 5px per second
-and which decays at the rate of 1px per second if the thrust button is
-released. 
+The player controls a spaceship that is represented by an isosceles 
+triangle.  The 'nose' of the triangle should be a 30 degree angle.  The 
+attitude of the triangle should be 12px.  The lines should be drawn in white.
 
-Pressing the O button causes the player's ship to fire small 
+When the player presses the right button, the ship rotates by 15 degrees 
+clockwise; pressing left rotates counterclockwise.  The ship should contine
+to rotate for as long as the button is held.  At the start of the game, the
+ship is drawn in the center of the screen with it's nose pointing up.
+
+When the player pushes the x button, this is applies thrust to the ship - 
+it gets forward momentum at the rate of 10px per second and which decays 
+at the rate of 1px per second if the thrust button is released.  While the
+ship's thrust is active, a red equilateral triangle should be drawn at the base
+of the player's ship, pointing in the opposite direction as the nose of the ship.
+
+Pressing the O button causes the player's ship to fire small 2px
 projectiles in a straight line from the nose of the ship which travel for 64
-pixels at the rate of 10 pixels per second.  After that, they disappear from play.
+pixels at the rate of 20 pixels per second.  After that, they disappear 
+from play.  The projectiles should be orange in color.
 
-The game should randomly materialize asteroids across the playfield 
-which move along random vectors at speeds ranging from 1 to 5px per second.
+The game should randomly materialize 10 large asteroids across the playfield 
+which move along random vectors at speeds ranging from 5 to 10px per second.
+Care should be taken to ensure that none of the initial asteroid positions are within
+20px of the player's ship locaiton.
+
 There are three sizes of asteroids, large medium and small.  Asteroids should
 be drawn as circles using the circle funcion.  A large asteroid is 16px in diamter, 
 a medium is 12 and a small is 8.
@@ -31,12 +41,29 @@ If the player's shot collides with an asteroid, it is replaced by two asteroids
 of the next smaller size, moving again on a random vector.  If a small asteroid
 is hit by a shot, it is removed from play.
 
-If the player's ship collides with an asteroid, it is destroyed and the game
-returns to the title screen.
+If the player manages to destroy all of the asteroids on the playfield, there is a 
+3 second pause, at which point 10 new large asteroids are placed on the screen following
+the game setup rules.
+
+If the player's ship collides with an asteroid, it is destroyed.  The 
+player is given a total of three ships at the start of the game.  The number
+of ships remaining in reserve is indicated with small 8px upward pointing
+isosceles triangles in the upper left corner of the screen.  If three ships
+are destroyed, the game returns to the title screen.
 
 The player receives points for destroying asteroids - 10 for a large, 20 for a medium
 and 30 for a small.  The score is displayed in the upper right corner of the screen.
 
+At random, every 30 to 60 seconds, a UFO will appear.  It will move from left to
+right or right to left across the screen, periodically firing 2px green projectiles
+in random directions.  These projectiles can damage or asteroids the same as
+the player's (though the player received no points for this).  If a projectile
+hits the player's ship, the player's ship is destroyed.  If the player's projectiles
+hit the UFO, it is destroyed and the player is awarded 100 points.  If the UFO and
+the player collide, they are both destroyed.
+
+The entire gamescreen is a torus: all objects, including asteroids, the player's ship,
+shots and UFOs should 'warp' across the edges of the screen and appear on the other side.
 
 All of the game logic should be implemented in the update and draw functions
 of GameScreen.lua.
