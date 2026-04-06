@@ -2,44 +2,87 @@
 GameScreen = {}
 
 local SCREEN_SIZE = 128
-local SCREEN_CENTER = SCREEN_SIZE / 2
-local GAME_DT = 1 / 30
+local SCREEN_CENTER = 64
+local FIXED_DT = 1 / 30
 
-local SHIP_ALTITUDE = 12
+local CADENCE_CHANNEL = 0
+local ACTION_CHANNEL = 1
+local UFO_CHANNEL = 2
+local THRUST_CHANNEL = 3
+
+local SHIP_ALTITUDE = 8
 local SHIP_HALF_ALTITUDE = SHIP_ALTITUDE / 2
-local SHIP_HALF_NOSE_ANGLE = 22.5 / 360
-local SHIP_HALF_BASE = SHIP_ALTITUDE * abs(sin(SHIP_HALF_NOSE_ANGLE) / cos(SHIP_HALF_NOSE_ANGLE))
-local SHIP_RADIUS = 7
-local SHIP_ROTATION_SPEED = 180 / 360
-local SHIP_THRUST_ACCEL = 20
+local SHIP_HALF_ANGLE = 1 / 16
+local TAN_22_5 = 0.41421356237
+local SHIP_HALF_BASE = SHIP_ALTITUDE * TAN_22_5
+local SHIP_RADIUS = 5
+local SHIP_ROTATION_SPEED = 0.5
+local SHIP_THRUST = 20
 local SHIP_DAMPING = 1
 local SHIP_MAX_SPEED = 20
-local SHIP_INVULNERABILITY = 2
+local SHIP_RESPAWN_DELAY = 3
+local SHIP_INVULN_TIME = 2
 
 local BULLET_SPEED = 20
-local BULLET_RANGE = 64
+local BULLET_MAX_DISTANCE = 64
 local BULLET_RADIUS = 1
-local BULLET_COOLDOWN = 0.2
+local FIRE_COOLDOWN = 0.2
 
 local UFO_BULLET_SPEED = 10
 local UFO_SPEED = 15
-local UFO_RADIUS = 7
+local UFO_RADIUS = 6
 
-local RESPAWN_DELAY = 3
-local WAVE_DELAY = 3
+local ASTEROID_LARGE = 1
+local ASTEROID_MEDIUM = 2
+local ASTEROID_SMALL = 3
 
-local ASTEROID_LARGE = "large"
-local ASTEROID_MEDIUM = "medium"
-local ASTEROID_SMALL = "small"
-
-local ASTEROID_CONFIG = {
-    [ASTEROID_LARGE] = {radius = 8, score = 10, split = ASTEROID_MEDIUM, threat = 1},
-    [ASTEROID_MEDIUM] = {radius = 6, score = 20, split = ASTEROID_SMALL, threat = 0.5},
-    [ASTEROID_SMALL] = {radius = 4, score = 30, split = nil, threat = 0.25},
+local ASTEROID_RADII = {
+    8,
+    6,
+    4
 }
 
+local ASTEROID_POINTS = {
+    10,
+    20,
+    30
+}
+
+local ASTEROID_THREAT = {
+    4,
+    2,
+    1
+}
+
+local ASTEROID_SPEED_MIN = {
+    5,
+    7,
+    9
+}
+
+local ASTEROID_SPEED_MAX = {
+    10,
+    12,
+    14
+}
+
+local TITLE_LETTER_WIDTH = 8
+local TITLE_LETTER_HEIGHT = 16
+local TITLE_SPACING = 2
+local TITLE_Y = 18
+
+local function rand_range(min_value, max_value)
+    return min_value + rnd(max_value - min_value)
+end
+
 local function clamp(value, min_value, max_value)
-    return max(min_value, min(value, max_value))
+    if value < min_value then
+        return min_value
+    end
+    if value > max_value then
+        return max_value
+    end
+    return value
 end
 
 local function wrap_coord(value)
@@ -52,223 +95,188 @@ local function wrap_coord(value)
     return value
 end
 
-local function torus_delta(a, b)
+local function shortest_delta(a, b)
     local delta = b - a
-    if delta > SCREEN_CENTER then
+    if delta > SCREEN_SIZE / 2 then
         delta -= SCREEN_SIZE
-    elseif delta < -SCREEN_CENTER then
+    elseif delta < -SCREEN_SIZE / 2 then
         delta += SCREEN_SIZE
     end
     return delta
 end
 
-local function distance_sq(x1, y1, x2, y2)
-    local dx = x2 - x1
-    local dy = y2 - y1
+local function dist_sq(ax, ay, bx, by)
+    local dx = bx - ax
+    local dy = by - ay
     return dx * dx + dy * dy
 end
 
-local function torus_distance_sq(x1, y1, x2, y2)
-    local dx = torus_delta(x1, x2)
-    local dy = torus_delta(y1, y2)
+local function wrapped_dist_sq(ax, ay, bx, by)
+    local dx = shortest_delta(ax, bx)
+    local dy = shortest_delta(ay, by)
     return dx * dx + dy * dy
 end
 
-local function collision_distance_sq(a, b)
-    if a.wrap and b.wrap then
-        return torus_distance_sq(a.x, a.y, b.x, b.y)
-    end
-
-    if a.wrap or b.wrap then
-        local wrapped = a.wrap and a or b
-        local direct = a.wrap and b or a
-        local best = 32767
-        for ox = -SCREEN_SIZE, SCREEN_SIZE, SCREEN_SIZE do
-            for oy = -SCREEN_SIZE, SCREEN_SIZE, SCREEN_SIZE do
-                local value = distance_sq(wrapped.x + ox, wrapped.y + oy, direct.x, direct.y)
-                if value < best then
-                    best = value
-                end
-            end
-        end
-        return best
-    end
-
-    return distance_sq(a.x, a.y, b.x, b.y)
+local function vec_from_angle(angle, magnitude)
+    return cos(angle) * magnitude, sin(angle) * magnitude
 end
 
-local function circles_overlap(a, b)
-    local radius = a.radius + b.radius
-    return collision_distance_sq(a, b) <= radius * radius
+local function normalize(vx, vy)
+    local magnitude = sqrt(vx * vx + vy * vy)
+    if magnitude <= 0 then
+        return 0, 0, 0
+    end
+    return vx / magnitude, vy / magnitude, magnitude
 end
 
-local function limit_speed(vx, vy, max_speed)
-    local speed = sqrt(vx * vx + vy * vy)
-    if speed > max_speed and speed > 0 then
-        local scale = max_speed / speed
-        return vx * scale, vy * scale
+local function limit_velocity(vx, vy, max_speed)
+    local nx, ny, speed = normalize(vx, vy)
+    if speed > max_speed then
+        return nx * max_speed, ny * max_speed
     end
     return vx, vy
 end
 
-local function random_angle()
-    return rnd(1)
+local function add_object(collection, object)
+    add(collection, object)
+    return object
 end
 
-local function random_velocity(min_speed, max_speed)
-    local angle = random_angle()
-    local speed = min_speed + rnd(max_speed - min_speed)
-    return cos(angle) * speed, sin(angle) * speed
-end
-
-local function triangle_points(cx, cy, angle, altitude, half_base)
-    local fx = cos(angle)
-    local fy = sin(angle)
-    local rx = -fy
-    local ry = fx
-    local nose_x = cx + fx * (altitude * 0.5)
-    local nose_y = cy + fy * (altitude * 0.5)
-    local base_cx = cx - fx * (altitude * 0.5)
-    local base_cy = cy - fy * (altitude * 0.5)
-    local left_x = base_cx - rx * half_base
-    local left_y = base_cy - ry * half_base
-    local right_x = base_cx + rx * half_base
-    local right_y = base_cy + ry * half_base
-    return nose_x, nose_y, left_x, left_y, right_x, right_y, base_cx, base_cy
-end
-
-local function draw_triangle(cx, cy, angle, altitude, half_base, color)
-    local nose_x, nose_y, left_x, left_y, right_x, right_y = triangle_points(cx, cy, angle, altitude, half_base)
-    line(nose_x, nose_y, left_x, left_y, color)
-    line(left_x, left_y, right_x, right_y, color)
-    line(right_x, right_y, nose_x, nose_y, color)
-end
-
-local function draw_wrapped(x, y, radius, draw_fn)
-    draw_fn(x, y)
-
-    local x_offsets = {0}
-    local y_offsets = {0}
-
-    if x < radius then
-        add(x_offsets, SCREEN_SIZE)
-    elseif x > SCREEN_SIZE - radius then
-        add(x_offsets, -SCREEN_SIZE)
-    end
-
-    if y < radius then
-        add(y_offsets, SCREEN_SIZE)
-    elseif y > SCREEN_SIZE - radius then
-        add(y_offsets, -SCREEN_SIZE)
-    end
-
-    for i = 1, #x_offsets do
-        for j = 1, #y_offsets do
-            local ox = x_offsets[i]
-            local oy = y_offsets[j]
-            if ox ~= 0 or oy ~= 0 then
-                draw_fn(x + ox, y + oy)
-            end
+local function remove_dead(collection)
+    for i = #collection, 1, -1 do
+        if collection[i].dead then
+            deli(collection, i)
         end
     end
 end
 
-local Explosion = {}
+local function fat_line(x1, y1, x2, y2, color)
+    line(x1, y1, x2, y2, color)
+    line(x1 + 1, y1 + 1, x2 + 1, y2 + 1, color)
+end
 
-function Explosion.new(x, y, color)
-    local rays = {}
-    for i = 1, 6 do
-        add(rays, {angle = random_angle(), length = 3 + rnd(4)})
-    end
+local function draw_triangle_outline(x1, y1, x2, y2, x3, y3, color)
+    line(x1, y1, x2, y2, color)
+    line(x2, y2, x3, y3, color)
+    line(x3, y3, x1, y1, color)
+end
 
+local Ship = {}
+
+function Ship.new(game, x, y, invuln_time)
     local self = {
+        game = game,
         x = x,
         y = y,
-        color = color or WHITE,
-        timer = 0.5,
-        age = 0,
-        radius = 0,
-        rays = rays,
-        wrap = true,
+        angle = 0.25,
+        vx = 0,
+        vy = 0,
+        fire_cooldown = 0,
+        invuln_timer = invuln_time or 0,
+        thrusting = false,
+        dead = false
     }
-    setmetatable(self, { __index = Explosion })
+    setmetatable(self, { __index = Ship })
     return self
 end
 
-function Explosion:update(dt)
-    self.age += dt
-    self.timer -= dt
-    self.radius = 2 + self.age * 18
-    if self.timer <= 0 then
-        self.dead = true
-    end
+function Ship:get_points(scale)
+    scale = scale or 1
+    local nose_x, nose_y = vec_from_angle(self.angle, SHIP_HALF_ALTITUDE * scale)
+    local rear_x, rear_y = vec_from_angle(self.angle, -SHIP_HALF_ALTITUDE * scale)
+    local right_x, right_y = vec_from_angle(self.angle + 0.25, SHIP_HALF_BASE * scale)
+    return {
+        self.x + nose_x,
+        self.y + nose_y,
+        self.x + rear_x + right_x,
+        self.y + rear_y + right_y,
+        self.x + rear_x - right_x,
+        self.y + rear_y - right_y
+    }
 end
 
-function Explosion:draw()
-    local fade = self.timer > 0.2 and self.color or RED
-    draw_wrapped(self.x, self.y, self.radius, function(draw_x, draw_y)
-        circ(draw_x, draw_y, self.radius, fade)
-        for i = 1, #self.rays do
-            local ray = self.rays[i]
-            local inner = self.radius * 0.25
-            local outer = self.radius + ray.length
-            local x1 = draw_x + cos(ray.angle) * inner
-            local y1 = draw_y + sin(ray.angle) * inner
-            local x2 = draw_x + cos(ray.angle) * outer
-            local y2 = draw_y + sin(ray.angle) * outer
-            line(x1, y1, x2, y2, fade)
+function Ship:get_nose_position()
+    local dx, dy = vec_from_angle(self.angle, SHIP_HALF_ALTITUDE)
+    return self.x + dx, self.y + dy
+end
+
+function Ship:update(dt)
+    self.invuln_timer = max(0, self.invuln_timer - dt)
+    self.fire_cooldown = max(0, self.fire_cooldown - dt)
+    self.thrusting = false
+
+    if btn(BUTTON_RIGHT) then
+        self.angle -= SHIP_ROTATION_SPEED * dt
+    end
+    if btn(BUTTON_LEFT) then
+        self.angle += SHIP_ROTATION_SPEED * dt
+    end
+
+    if btn(BUTTON_X) then
+        local ax, ay = vec_from_angle(self.angle, SHIP_THRUST * dt)
+        self.vx += ax
+        self.vy += ay
+        self.thrusting = true
+    else
+        local nx, ny, speed = normalize(self.vx, self.vy)
+        if speed > 0 then
+            local next_speed = max(0, speed - SHIP_DAMPING * dt)
+            self.vx = nx * next_speed
+            self.vy = ny * next_speed
         end
-    end)
-end
+    end
 
-local Bullet = {}
-
-function Bullet.new(x, y, angle, speed, color, radius, range, owner)
-    local self = {
-        x = x,
-        y = y,
-        vx = cos(angle) * speed,
-        vy = sin(angle) * speed,
-        color = color,
-        radius = radius,
-        ttl = range / speed,
-        wrap = true,
-        owner = owner,
-    }
-    setmetatable(self, { __index = Bullet })
-    return self
-end
-
-function Bullet:update(dt)
+    self.vx, self.vy = limit_velocity(self.vx, self.vy, SHIP_MAX_SPEED)
     self.x = wrap_coord(self.x + self.vx * dt)
     self.y = wrap_coord(self.y + self.vy * dt)
-    self.ttl -= dt
-    if self.ttl <= 0 then
-        self.dead = true
+
+    if buttonWasPressed(BUTTON_O) and self.fire_cooldown <= 0 then
+        self.fire_cooldown = FIRE_COOLDOWN
+        self.game:spawn_player_bullet(self)
+        self.game:play_action_sound(2)
     end
+    self.game:set_thrust_sound_active(self.thrusting)
 end
 
-function Bullet:draw()
-    draw_wrapped(self.x, self.y, self.radius + 1, function(draw_x, draw_y)
-        circfill(draw_x, draw_y, self.radius, self.color)
-    end)
+function Ship:draw()
+    if self.invuln_timer > 0 and flr(self.invuln_timer * 10) % 2 == 0 then
+        return
+    end
+
+    local points = self:get_points(1)
+    draw_triangle_outline(points[1], points[2], points[3], points[4], points[5], points[6], WHITE)
+
+    if self.thrusting then
+        local rear_dx, rear_dy = vec_from_angle(self.angle, -SHIP_HALF_ALTITUDE)
+        local flame_tip_dx, flame_tip_dy = vec_from_angle(self.angle, -6)
+        local side_dx, side_dy = vec_from_angle(self.angle + 0.25, 2)
+        local base_x = self.x + rear_dx
+        local base_y = self.y + rear_dy
+        draw_triangle_outline(
+            self.x + flame_tip_dx,
+            self.y + flame_tip_dy,
+            base_x + side_dx,
+            base_y + side_dy,
+            base_x - side_dx,
+            base_y - side_dy,
+            RED
+        )
+    end
 end
 
 local Asteroid = {}
 
-function Asteroid.new(size, x, y, vx, vy)
-    local config = ASTEROID_CONFIG[size]
+function Asteroid.new(game, size_index, x, y, angle, speed)
+    local vx, vy = vec_from_angle(angle, speed)
     local self = {
-        size = size,
+        game = game,
+        size = size_index,
         x = x,
         y = y,
         vx = vx,
         vy = vy,
-        radius = config.radius,
-        score = config.score,
-        split = config.split,
-        threat = config.threat,
-        wrap = true,
+        radius = ASTEROID_RADII[size_index],
+        dead = false
     }
     setmetatable(self, { __index = Asteroid })
     return self
@@ -280,643 +288,727 @@ function Asteroid:update(dt)
 end
 
 function Asteroid:draw()
-    draw_wrapped(self.x, self.y, self.radius + 1, function(draw_x, draw_y)
-        circ(draw_x, draw_y, self.radius, WHITE)
-    end)
+    circ(self.x, self.y, self.radius, WHITE)
+end
+
+local Bullet = {}
+
+function Bullet.new(game, x, y, angle, speed, color, is_enemy)
+    local vx, vy = vec_from_angle(angle, speed)
+    local self = {
+        game = game,
+        x = x,
+        y = y,
+        vx = vx,
+        vy = vy,
+        color = color,
+        is_enemy = is_enemy,
+        travelled = 0,
+        radius = BULLET_RADIUS,
+        dead = false
+    }
+    setmetatable(self, { __index = Bullet })
+    return self
+end
+
+function Bullet:update(dt)
+    self.x = wrap_coord(self.x + self.vx * dt)
+    self.y = wrap_coord(self.y + self.vy * dt)
+    self.travelled += sqrt(self.vx * self.vx + self.vy * self.vy) * dt
+    if self.travelled >= BULLET_MAX_DISTANCE then
+        self.dead = true
+    end
+end
+
+function Bullet:draw()
+    circfill(self.x, self.y, self.radius, self.color)
 end
 
 local UFO = {}
 
-function UFO.new(from_left, y)
+function UFO.new(game, x, y, direction)
     local self = {
-        x = from_left and -12 or 140,
+        game = game,
+        x = x,
         y = y,
-        vx = from_left and UFO_SPEED or -UFO_SPEED,
-        vy = 0,
-        width = 14,
-        height = 6,
+        direction = direction,
+        vx = direction * UFO_SPEED,
+        fire_timer = rand_range(1, 2),
         radius = UFO_RADIUS,
-        wrap = false,
-        fire_timer = 1 + rnd(1),
+        dead = false
     }
     setmetatable(self, { __index = UFO })
     return self
 end
 
-function UFO:update(dt, screen)
+function UFO:update(dt)
     self.x += self.vx * dt
     self.fire_timer -= dt
     if self.fire_timer <= 0 then
-        screen:spawn_ufo_bullet(self)
-        self.fire_timer = 1 + rnd(1)
+        self.fire_timer = rand_range(1, 2)
+        self.game:spawn_ufo_bullet(self)
+        self.game:play_action_sound(2)
     end
 
-    if self.vx > 0 and self.x - self.width * 0.5 > SCREEN_SIZE then
+    if self.direction > 0 and self.x > SCREEN_SIZE + self.radius + 2 then
         self.dead = true
-        self.left_screen = true
-    elseif self.vx < 0 and self.x + self.width * 0.5 < 0 then
+    elseif self.direction < 0 and self.x < -self.radius - 2 then
         self.dead = true
-        self.left_screen = true
     end
 end
 
 function UFO:draw()
-    local left = self.x - self.width * 0.5
-    local right = self.x + self.width * 0.5
-    local top = self.y - self.height * 0.5
-    local bottom = self.y + self.height * 0.5
+    local left = self.x - 6
+    local right = self.x + 6
+    local top = self.y - 2
+    local bottom = self.y + 2
     line(left, top, right, top, GREEN)
-    line(right, top, right, bottom, GREEN)
-    line(right, bottom, left, bottom, GREEN)
-    line(left, bottom, left, top, GREEN)
-    line(left + 3, top - 2, right - 3, top - 2, GREEN)
-    line(left + 1, self.y, right - 1, self.y, GREEN)
+    line(left, bottom, right, bottom, GREEN)
+    line(left, top, left + 2, bottom, GREEN)
+    line(right, top, right - 2, bottom, GREEN)
+    line(self.x - 3, top - 2, self.x + 3, top - 2, GREEN)
+    line(self.x - 5, self.y, self.x + 5, self.y, GREEN)
 end
 
-local Ship = {}
+local Explosion = {}
 
-function Ship.new(x, y)
+function Explosion.new(x, y, angle)
     local self = {
         x = x,
         y = y,
-        angle = 0.25,
-        vx = 0,
-        vy = 0,
-        radius = SHIP_RADIUS,
-        wrap = true,
-        fire_cooldown = 0,
-        invulnerability = 0,
-        thrusting = false,
+        timer = 0.7,
+        angle = angle,
+        dead = false
     }
-    setmetatable(self, { __index = Ship })
+    setmetatable(self, { __index = Explosion })
     return self
 end
 
-function Ship:get_nose_position()
-    local nose_x, nose_y = triangle_points(self.x, self.y, self.angle, SHIP_ALTITUDE, SHIP_HALF_BASE)
-    return nose_x, nose_y
-end
-
-function Ship:update(dt, screen, fire_pressed)
-    self.thrusting = false
-
-    if btn(BUTTON_RIGHT) then
-        self.angle -= SHIP_ROTATION_SPEED * dt
-    end
-    if btn(BUTTON_LEFT) then
-        self.angle += SHIP_ROTATION_SPEED * dt
-    end
-
-    if self.angle < 0 then
-        self.angle += 1
-    elseif self.angle >= 1 then
-        self.angle -= 1
-    end
-
-    if btn(BUTTON_X) then
-        local fx = cos(self.angle)
-        local fy = sin(self.angle)
-        self.vx += fx * SHIP_THRUST_ACCEL * dt
-        self.vy += fy * SHIP_THRUST_ACCEL * dt
-        self.thrusting = true
-    else
-        local speed = sqrt(self.vx * self.vx + self.vy * self.vy)
-        if speed > 0 then
-            local reduced = max(0, speed - SHIP_DAMPING * dt)
-            if reduced == 0 then
-                self.vx = 0
-                self.vy = 0
-            else
-                local scale = reduced / speed
-                self.vx *= scale
-                self.vy *= scale
-            end
-        end
-    end
-
-    self.vx, self.vy = limit_speed(self.vx, self.vy, SHIP_MAX_SPEED)
-    self.x = wrap_coord(self.x + self.vx * dt)
-    self.y = wrap_coord(self.y + self.vy * dt)
-
-    self.fire_cooldown = max(0, self.fire_cooldown - dt)
-    self.invulnerability = max(0, self.invulnerability - dt)
-
-    if fire_pressed and self.fire_cooldown <= 0 then
-        screen:spawn_player_bullet(self)
-        self.fire_cooldown = BULLET_COOLDOWN
+function Explosion:update(dt)
+    self.timer -= dt
+    if self.timer <= 0 then
+        self.dead = true
     end
 end
 
-function Ship:draw()
-    if self.invulnerability > 0 and flr(self.invulnerability * 10) % 2 == 0 then
-        return
+function Explosion:draw()
+    local progress = 1 - clamp(self.timer / 0.7, 0, 1)
+    for i = 0, 2 do
+        local shard_angle = self.angle + i / 3
+        local inner_dx, inner_dy = vec_from_angle(shard_angle, progress * 2)
+        local outer_dx, outer_dy = vec_from_angle(shard_angle, 3 + progress * 5)
+        line(self.x + inner_dx, self.y + inner_dy, self.x + outer_dx, self.y + outer_dy, WHITE)
     end
+    local ring = progress * 6
+    if ring > 0 then
+        circ(self.x, self.y, ring, RED)
+    end
+end
 
-    draw_wrapped(self.x, self.y, SHIP_ALTITUDE, function(draw_x, draw_y)
-        if self.thrusting then
-            local flame_altitude = 4
-            local flame_half_base = flame_altitude / sqrt(3)
-            local fx = cos(self.angle)
-            local fy = sin(self.angle)
-            local flame_x = draw_x - fx * (SHIP_HALF_ALTITUDE + flame_altitude * 0.5)
-            local flame_y = draw_y - fy * (SHIP_HALF_ALTITUDE + flame_altitude * 0.5)
-            draw_triangle(flame_x, flame_y, self.angle + 0.5, flame_altitude, flame_half_base, RED)
-        end
+local function draw_title_letter(letter, x, y, color)
+    local x0 = x
+    local x1 = x + TITLE_LETTER_WIDTH / 2
+    local x2 = x + TITLE_LETTER_WIDTH
+    local y0 = y
+    local y1 = y + TITLE_LETTER_HEIGHT / 2
+    local y2 = y + TITLE_LETTER_HEIGHT
 
-        draw_triangle(draw_x, draw_y, self.angle, SHIP_ALTITUDE, SHIP_HALF_BASE, WHITE)
-    end)
+    if letter == "a" then
+        fat_line(x0, y2, x1, y0, color)
+        fat_line(x1, y0, x2, y2, color)
+        fat_line(x0 + 2, y1, x2 - 2, y1, color)
+    elseif letter == "i" then
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x1, y0, x1, y2, color)
+        fat_line(x0, y2, x2, y2, color)
+    elseif letter == "s" then
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x0, y0, x0, y1, color)
+        fat_line(x0, y1, x2, y1, color)
+        fat_line(x2, y1, x2, y2, color)
+        fat_line(x0, y2, x2, y2, color)
+    elseif letter == "t" then
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x1, y0, x1, y2, color)
+    elseif letter == "e" then
+        fat_line(x0, y0, x0, y2, color)
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x0, y1, x2 - 1, y1, color)
+        fat_line(x0, y2, x2, y2, color)
+    elseif letter == "r" then
+        fat_line(x0, y0, x0, y2, color)
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x2, y0, x2, y1, color)
+        fat_line(x0, y1, x2, y1, color)
+        fat_line(x1, y1, x2, y2, color)
+    elseif letter == "o" then
+        fat_line(x0, y0, x2, y0, color)
+        fat_line(x0, y2, x2, y2, color)
+        fat_line(x0, y0, x0, y2, color)
+        fat_line(x2, y0, x2, y2, color)
+    elseif letter == "d" then
+        fat_line(x0, y0, x0, y2, color)
+        fat_line(x0, y0, x2 - 1, y0, color)
+        fat_line(x0, y2, x2 - 1, y2, color)
+        fat_line(x2, y0 + 2, x2, y2 - 2, color)
+    end
 end
 
 function GameScreen.new()
     local self = {
         isDone = false,
+        mode = "attract",
         score = 0,
         lives = 3,
-        ship = nil,
-        asteroids = {},
-        bullets = {},
-        enemyBullets = {},
-        ufos = {},
-        effects = {},
+        wave = 1,
+        wave_clear_timer = nil,
         respawn_timer = 0,
-        wave_timer = 0,
-        ufo_timer = 30 + rnd(30),
+        game_over_timer = 0,
+        prompt_timer = 0,
         beat_timer = 0,
         next_beat = 0,
-        thrust_sound_timer = 0,
-        ufo_hum_timer = 0,
-        awaiting_game_over = false,
-        game_over = false,
+        ufo_spawn_timer = rand_range(30, 60),
+        pending_ufo = false,
+        asteroids = {},
+        bullets = {},
+        enemy_bullets = {},
+        ufos = {},
+        effects = {},
+        ship = nil,
+        wave_start_count = 6,
+        wave_start_threat = 24,
+        thrust_sound_active = false,
+        ufo_sound_active = false
     }
     setmetatable(self, { __index = GameScreen })
-    self.ship = Ship.new(SCREEN_CENTER, SCREEN_CENTER)
-    self:spawn_wave()
     music(-1)
+    self:reset_attract_mode()
     return self
 end
 
-function GameScreen:add_effect(x, y, color)
-    add(self.effects, Explosion.new(x, y, color))
+function GameScreen:reset_attract_mode()
+    self.mode = "attract"
+    self.score = 0
+    self.lives = 3
+    self.wave = 1
+    self.wave_clear_timer = nil
+    self.respawn_timer = 0
+    self.game_over_timer = 0
+    self.prompt_timer = 0
+    self.beat_timer = 0
+    self.next_beat = 0
+    self.ufo_spawn_timer = rand_range(30, 60)
+    self.pending_ufo = false
+    self.ship = nil
+    self.asteroids = {}
+    self.bullets = {}
+    self.enemy_bullets = {}
+    self.ufos = {}
+    self.effects = {}
+    self:set_thrust_sound_active(false)
+    self:set_ufo_sound_active(false)
+    self:spawn_wave(6, 20)
 end
 
-function GameScreen:play_sound(sound, channel)
-    if channel ~= nil then
-        sfx(sound, channel)
-    else
-        sfx(sound)
+function GameScreen:start_game()
+    self.mode = "playing"
+    self.score = 0
+    self.lives = 3
+    self.wave = 1
+    self.wave_clear_timer = nil
+    self.respawn_timer = 0
+    self.game_over_timer = 0
+    self.prompt_timer = 0
+    self.bullets = {}
+    self.enemy_bullets = {}
+    self.ufos = {}
+    self.effects = {}
+    self.pending_ufo = false
+    self.ufo_spawn_timer = rand_range(30, 60)
+    self:set_ufo_sound_active(false)
+    self.ship = Ship.new(self, SCREEN_CENTER, SCREEN_CENTER, 0)
+end
+
+function GameScreen:play_action_sound(sound_index)
+    sfx(sound_index, ACTION_CHANNEL)
+end
+
+function GameScreen:set_thrust_sound_active(active)
+    if active and not self.thrust_sound_active then
+        sfx(4, THRUST_CHANNEL)
+    elseif not active and self.thrust_sound_active then
+        sfx(-1, THRUST_CHANNEL)
     end
+    self.thrust_sound_active = active
 end
 
-function GameScreen:stop_channel(channel)
-    sfx(-1, channel)
+function GameScreen:set_ufo_sound_active(active)
+    if active and not self.ufo_sound_active then
+        sfx(5, UFO_CHANNEL)
+    elseif not active and self.ufo_sound_active then
+        sfx(-1, UFO_CHANNEL)
+    end
+    self.ufo_sound_active = active
 end
 
-function GameScreen:spawn_player_bullet(ship)
-    local nose_x, nose_y = ship:get_nose_position()
-    local bullet = Bullet.new(
-        wrap_coord(nose_x),
-        wrap_coord(nose_y),
-        ship.angle,
-        BULLET_SPEED,
-        ORANGE,
-        BULLET_RADIUS,
-        BULLET_RANGE,
-        "player"
-    )
-    add(self.bullets, bullet)
-    self:play_sound(2, 2)
+function GameScreen:get_active_ufo_count()
+    local count = 0
+    for ufo in all(self.ufos) do
+        if not ufo.dead then
+            count += 1
+        end
+    end
+    return count
 end
 
-function GameScreen:spawn_ufo_bullet(ufo)
-    local angle = random_angle()
-    local bullet = Bullet.new(
-        wrap_coord(ufo.x),
-        wrap_coord(ufo.y),
-        angle,
-        UFO_BULLET_SPEED,
-        GREEN,
-        BULLET_RADIUS,
-        BULLET_RANGE,
-        "ufo"
-    )
-    add(self.enemyBullets, bullet)
-    self:play_sound(2, 2)
+function GameScreen:get_asteroid_threat()
+    local threat = 0
+    for asteroid in all(self.asteroids) do
+        if not asteroid.dead then
+            threat += ASTEROID_THREAT[asteroid.size]
+        end
+    end
+    return threat
 end
 
-function GameScreen:spawn_asteroid(size, x, y)
-    local vx, vy = random_velocity(5, 10)
-    add(self.asteroids, Asteroid.new(size, x, y, vx, vy))
+function GameScreen:get_cadence_interval()
+    if #self.asteroids <= 0 then
+        return 2
+    end
+    if #self.asteroids == 1 then
+        return 0.5
+    end
+    local threat_ratio = self:get_asteroid_threat() / self.wave_start_threat
+    threat_ratio = clamp(threat_ratio, 0, 1)
+    return 0.5 + 1.5 * threat_ratio
 end
 
-function GameScreen:spawn_split_asteroids(parent)
-    if not parent.split then
+function GameScreen:update_cadence(dt)
+    if self.wave_clear_timer or self.mode == "game_over" or #self.asteroids <= 0 then
+        sfx(-1, CADENCE_CHANNEL)
+        self.beat_timer = 0
         return
     end
 
-    for i = 1, 2 do
-        local vx, vy = random_velocity(6, 11)
-        add(self.asteroids, Asteroid.new(parent.split, parent.x, parent.y, vx, vy))
+    self.beat_timer -= dt
+    local interval = self:get_cadence_interval()
+    while self.beat_timer <= 0 do
+        sfx(self.next_beat, CADENCE_CHANNEL)
+        self.next_beat = 1 - self.next_beat
+        self.beat_timer += interval
     end
 end
 
-function GameScreen:can_spawn_at(x, y, min_distance)
-    for i = 1, #self.asteroids do
-        local asteroid = self.asteroids[i]
-        local radius = asteroid.radius + min_distance
-        if torus_distance_sq(x, y, asteroid.x, asteroid.y) < radius * radius then
+function GameScreen:is_position_clear_from_asteroids(x, y, radius, use_wrap)
+    for asteroid in all(self.asteroids) do
+        if not asteroid.dead then
+            local distance_sq = use_wrap and wrapped_dist_sq(x, y, asteroid.x, asteroid.y) or dist_sq(x, y, asteroid.x, asteroid.y)
+            local min_distance = radius + asteroid.radius
+            if distance_sq < min_distance * min_distance then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+function GameScreen:is_ship_spawn_safe(x, y, extra_radius)
+    return self:is_position_clear_from_asteroids(x, y, extra_radius, true)
+end
+
+function GameScreen:is_ufo_spawn_safe(x, y)
+    if not self:is_position_clear_from_asteroids(x, y, 20, false) then
+        return false
+    end
+    if self.ship and not self.ship.dead then
+        if dist_sq(x, y, self.ship.x, self.ship.y) < 20 * 20 then
             return false
         end
     end
     return true
 end
 
-function GameScreen:spawn_wave()
-    local avoid_x = self.ship and self.ship.x or SCREEN_CENTER
-    local avoid_y = self.ship and self.ship.y or SCREEN_CENTER
+function GameScreen:spawn_asteroid(size_index, x, y)
+    local angle = rnd(1)
+    local speed = rand_range(ASTEROID_SPEED_MIN[size_index], ASTEROID_SPEED_MAX[size_index])
+    return add_object(self.asteroids, Asteroid.new(self, size_index, x, y, angle, speed))
+end
 
-    for i = #self.bullets, 1, -1 do
-        deli(self.bullets, i)
-    end
-    for i = #self.enemyBullets, 1, -1 do
-        deli(self.enemyBullets, i)
-    end
+function GameScreen:spawn_wave(large_count, center_exclusion)
+    self.wave_start_count = large_count
+    self.wave_start_threat = large_count * ASTEROID_THREAT[ASTEROID_LARGE]
+    self.wave_clear_timer = nil
+    self.beat_timer = 0
+    self.next_beat = 0
 
-    for i = 1, 10 do
+    for i = 1, large_count do
         local attempts = 0
-        local placed = false
-        while attempts < 200 and not placed do
-            local x = rnd(SCREEN_SIZE)
-            local y = rnd(SCREEN_SIZE)
-            if torus_distance_sq(x, y, avoid_x, avoid_y) >= 20 * 20 then
-                self:spawn_asteroid(ASTEROID_LARGE, x, y)
-                placed = true
+        local x = rnd(SCREEN_SIZE)
+        local y = rnd(SCREEN_SIZE)
+        while attempts < 64 do
+            x = rnd(SCREEN_SIZE)
+            y = rnd(SCREEN_SIZE)
+            local center_ok = true
+            if center_exclusion and center_exclusion > 0 then
+                center_ok = dist_sq(x, y, SCREEN_CENTER, SCREEN_CENTER) >= center_exclusion * center_exclusion
+            end
+            if center_ok and self:is_position_clear_from_asteroids(x, y, ASTEROID_RADII[ASTEROID_LARGE] + 4, false) then
+                break
             end
             attempts += 1
         end
-
-        if not placed then
-            self:spawn_asteroid(ASTEROID_LARGE, rnd(SCREEN_SIZE), rnd(SCREEN_SIZE))
-        end
+        self:spawn_asteroid(ASTEROID_LARGE, x, y)
     end
-
-    self.wave_timer = 0
-    self.beat_timer = 0
 end
 
-function GameScreen:spawn_ufo()
-    local from_left = rnd(1) < 0.5
-    local y = 16 + rnd(96)
-    add(self.ufos, UFO.new(from_left, y))
-    self.ufo_hum_timer = 0
+function GameScreen:spawn_player_bullet(ship)
+    local x, y = ship:get_nose_position()
+    add_object(self.bullets, Bullet.new(self, x, y, ship.angle, BULLET_SPEED, ORANGE, false))
 end
 
-function GameScreen:destroy_asteroid(asteroid, award_points)
-    if asteroid.dead then
+function GameScreen:spawn_ufo_bullet(ufo)
+    add_object(self.enemy_bullets, Bullet.new(self, ufo.x, ufo.y, rnd(1), UFO_BULLET_SPEED, GREEN, true))
+end
+
+function GameScreen:destroy_ship(ship)
+    if not ship or ship.dead then
         return
     end
-
-    asteroid.dead = true
-    self:add_effect(asteroid.x, asteroid.y, WHITE)
-    self:spawn_split_asteroids(asteroid)
-    self:play_sound(3, 2)
-
-    if award_points then
-        self.score += asteroid.score
+    ship.dead = true
+    self.ship = nil
+    self:set_thrust_sound_active(false)
+    add_object(self.effects, Explosion.new(ship.x, ship.y, ship.angle))
+    self.lives -= 1
+    if self.lives > 0 then
+        self.respawn_timer = SHIP_RESPAWN_DELAY
+    else
+        self.mode = "game_over"
+        self.game_over_timer = 2.5
+        self:set_ufo_sound_active(false)
     end
-end
+    end
 
 function GameScreen:destroy_ufo(ufo, award_points)
     if ufo.dead then
         return
     end
-
     ufo.dead = true
-    self:add_effect(ufo.x, ufo.y, GREEN)
+    add_object(self.effects, Explosion.new(ufo.x, ufo.y, 0))
     if award_points then
         self.score += 100
     end
 end
 
-function GameScreen:destroy_ship()
-    if not self.ship then
+function GameScreen:destroy_asteroid_without_split(asteroid)
+    if asteroid.dead then
         return
     end
-
-    self:add_effect(self.ship.x, self.ship.y, WHITE)
-    self.ship = nil
-    self.lives -= 1
-    self.respawn_timer = self.lives > 0 and RESPAWN_DELAY or 0
-    self.thrust_sound_timer = 0
-    self:stop_channel(1)
-
-    if self.lives <= 0 then
-        self.awaiting_game_over = true
+    asteroid.dead = true
+    add_object(self.effects, Explosion.new(asteroid.x, asteroid.y, rnd(1)))
     end
-end
 
-function GameScreen:update_objects(objects, dt)
-    for i = 1, #objects do
-        objects[i]:update(dt, self)
-    end
-end
-
-function GameScreen:prune_dead(objects)
-    for i = #objects, 1, -1 do
-        if objects[i].dead then
-            deli(objects, i)
-        end
-    end
-end
-
-function GameScreen:handle_ship_respawn(dt)
-    if self.ship or self.game_over or self.awaiting_game_over or self.lives <= 0 then
+function GameScreen:split_asteroid(asteroid, award_points)
+    if asteroid.dead then
         return
     end
-
-    self.respawn_timer = max(0, self.respawn_timer - dt)
-    if self.respawn_timer <= 0 and self:can_spawn_at(SCREEN_CENTER, SCREEN_CENTER, 15) then
-        self.ship = Ship.new(SCREEN_CENTER, SCREEN_CENTER)
-        self.ship.invulnerability = SHIP_INVULNERABILITY
+    asteroid.dead = true
+    self:play_action_sound(3)
+    if award_points then
+        self.score += ASTEROID_POINTS[asteroid.size]
     end
+
+    if asteroid.size < ASTEROID_SMALL then
+        local child_size = asteroid.size + 1
+        for i = 1, 2 do
+            local child = self:spawn_asteroid(child_size, asteroid.x, asteroid.y)
+            if i == 2 then
+                child.vx = -child.vx
+                child.vy = -child.vy
+            end
+        end
+    end
+    add_object(self.effects, Explosion.new(asteroid.x, asteroid.y, rnd(1)))
 end
 
-function GameScreen:get_beat_interval()
-    if #self.asteroids == 0 then
-        return nil
+function GameScreen:try_spawn_ufo()
+    if #self.ufos > 0 or #self.asteroids <= 0 then
+        return false
     end
-
-    local threat = 0
-    for i = 1, #self.asteroids do
-        threat += self.asteroids[i].threat
-    end
-    threat = clamp(threat, 1, 10)
-
-    local t = (threat - 1) / 9
-    return 0.5 + t * 1.5
-end
-
-function GameScreen:update_cadence(dt)
-    if self.game_over or self.awaiting_game_over or self.wave_timer > 0 or #self.asteroids == 0 then
-        self:stop_channel(0)
-        self.beat_timer = 0
-        return
-    end
-
-    self.beat_timer -= dt
-    if self.beat_timer <= 0 then
-        self:play_sound(self.next_beat, 0)
-        self.next_beat = self.next_beat == 0 and 1 or 0
-        self.beat_timer = self:get_beat_interval()
-    end
-end
-
-function GameScreen:update_thrust_audio(dt)
-    if self.ship and self.ship.thrusting then
-        self.thrust_sound_timer -= dt
-        if self.thrust_sound_timer <= 0 then
-            self:play_sound(4, 1)
-            self.thrust_sound_timer = 0.12
-        end
-    else
-        self.thrust_sound_timer = 0
-        self:stop_channel(1)
-    end
-end
-
-function GameScreen:update_ufo_audio(dt)
-    if #self.ufos > 0 then
-        self.ufo_hum_timer -= dt
-        if self.ufo_hum_timer <= 0 then
-            self:play_sound(5, 3)
-            self.ufo_hum_timer = 0.5
-        end
-    else
-        self.ufo_hum_timer = 0
-        self:stop_channel(3)
-    end
-end
-
-function GameScreen:handle_collisions()
-    for i = 1, #self.bullets do
-        local bullet = self.bullets[i]
-        if not bullet.dead then
-            for j = 1, #self.asteroids do
-                local asteroid = self.asteroids[j]
-                if not asteroid.dead and circles_overlap(bullet, asteroid) then
-                    bullet.dead = true
-                    self:destroy_asteroid(asteroid, true)
-                    break
-                end
-            end
+    for attempt = 1, 32 do
+        local direction = rnd(1) < 0.5 and 1 or -1
+        local x = direction > 0 and -UFO_RADIUS or SCREEN_SIZE + UFO_RADIUS
+        local y = rand_range(12, SCREEN_SIZE - 12)
+        if self:is_ufo_spawn_safe(x, y) then
+            add_object(self.ufos, UFO.new(self, x, y, direction))
+            self:set_ufo_sound_active(true)
+            return true
         end
     end
-
-    for i = 1, #self.bullets do
-        local bullet = self.bullets[i]
-        if not bullet.dead then
-            for j = 1, #self.ufos do
-                local ufo = self.ufos[j]
-                if not ufo.dead and circles_overlap(bullet, ufo) then
-                    bullet.dead = true
-                    self:destroy_ufo(ufo, true)
-                    break
-                end
-            end
-        end
-    end
-
-    for i = 1, #self.enemyBullets do
-        local bullet = self.enemyBullets[i]
-        if not bullet.dead then
-            for j = 1, #self.asteroids do
-                local asteroid = self.asteroids[j]
-                if not asteroid.dead and circles_overlap(bullet, asteroid) then
-                    bullet.dead = true
-                    self:destroy_asteroid(asteroid, false)
-                    break
-                end
-            end
-        end
-    end
-
-    for i = 1, #self.ufos do
-        local ufo = self.ufos[i]
-        if not ufo.dead then
-            for j = 1, #self.asteroids do
-                local asteroid = self.asteroids[j]
-                if not asteroid.dead and circles_overlap(ufo, asteroid) then
-                    self:destroy_ufo(ufo, false)
-                    self:destroy_asteroid(asteroid, false)
-                    break
-                end
-            end
-        end
-    end
-
-    if self.ship and self.ship.invulnerability <= 0 then
-        for i = 1, #self.asteroids do
-            if not self.asteroids[i].dead and circles_overlap(self.ship, self.asteroids[i]) then
-                self:destroy_ship()
-                break
-            end
-        end
-
-        if self.ship then
-            for i = 1, #self.enemyBullets do
-                if not self.enemyBullets[i].dead and circles_overlap(self.ship, self.enemyBullets[i]) then
-                    self.enemyBullets[i].dead = true
-                    self:destroy_ship()
-                    break
-                end
-            end
-        end
-
-        if self.ship then
-            for i = 1, #self.ufos do
-                if not self.ufos[i].dead and circles_overlap(self.ship, self.ufos[i]) then
-                    self:destroy_ufo(self.ufos[i], false)
-                    self:destroy_ship()
-                    break
-                end
-            end
-        end
-    end
-end
-
-function GameScreen:update_wave_state(dt)
-    if #self.asteroids == 0 then
-        if self.wave_timer <= 0 then
-            self.wave_timer = WAVE_DELAY
-        else
-            self.wave_timer -= dt
-            if self.wave_timer <= 0 then
-                self:spawn_wave()
-            end
-        end
-    else
-        self.wave_timer = 0
-    end
+    return false
 end
 
 function GameScreen:update_ufo_spawns(dt)
-    if self.game_over or self.awaiting_game_over then
+    if self.mode ~= "playing" then
         return
     end
-
-    if #self.ufos == 0 then
-        self.ufo_timer -= dt
-        if self.ufo_timer <= 0 then
-            self:spawn_ufo()
-            self.ufo_timer = 30 + rnd(30)
+    if #self.ufos > 0 then
+        return
+    end
+    if self.pending_ufo then
+        if self:try_spawn_ufo() then
+            self.pending_ufo = false
+            self.ufo_spawn_timer = rand_range(30, 60)
+        end
+        return
+    end
+    self.ufo_spawn_timer -= dt
+    if self.ufo_spawn_timer <= 0 then
+        if self:try_spawn_ufo() then
+            self.ufo_spawn_timer = rand_range(30, 60)
+        else
+            self.pending_ufo = true
         end
     end
-end
+    end
+
+function GameScreen:update_respawn(dt)
+    if self.mode ~= "playing" or self.ship or self.lives <= 0 then
+        return
+    end
+    if self.respawn_timer > 0 then
+        self.respawn_timer = max(0, self.respawn_timer - dt)
+        return
+    end
+    if self:is_ship_spawn_safe(SCREEN_CENTER, SCREEN_CENTER, 15) then
+        self.ship = Ship.new(self, SCREEN_CENTER, SCREEN_CENTER, SHIP_INVULN_TIME)
+    end
+    end
+
+function GameScreen:update_wave_progress(dt)
+    if self.mode ~= "playing" then
+        return
+    end
+    if #self.asteroids > 0 then
+        return
+    end
+    if not self.wave_clear_timer then
+        self.wave_clear_timer = 3
+        return
+    end
+    self.wave_clear_timer -= dt
+    if self.wave_clear_timer <= 0 then
+        self.wave += 1
+        self:spawn_wave(min(5 + self.wave, 10), 0)
+    end
+    end
+
+function GameScreen:update_collection(collection, dt)
+    for object in all(collection) do
+        if not object.dead then
+            object:update(dt)
+        end
+    end
+    end
+
+function GameScreen:handle_collisions()
+    for bullet in all(self.bullets) do
+        if not bullet.dead then
+            for asteroid in all(self.asteroids) do
+                if not asteroid.dead then
+                    local hit_radius = bullet.radius + asteroid.radius
+                    if wrapped_dist_sq(bullet.x, bullet.y, asteroid.x, asteroid.y) <= hit_radius * hit_radius then
+                        bullet.dead = true
+                        self:split_asteroid(asteroid, true)
+                        break
+                    end
+                end
+            end
+        end
+        if not bullet.dead then
+            for ufo in all(self.ufos) do
+                if not ufo.dead then
+                    local hit_radius = bullet.radius + ufo.radius
+                    if dist_sq(bullet.x, bullet.y, ufo.x, ufo.y) <= hit_radius * hit_radius then
+                        bullet.dead = true
+                        self:destroy_ufo(ufo, true)
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    for bullet in all(self.enemy_bullets) do
+        if not bullet.dead then
+            for asteroid in all(self.asteroids) do
+                if not asteroid.dead then
+                    local hit_radius = bullet.radius + asteroid.radius
+                    if wrapped_dist_sq(bullet.x, bullet.y, asteroid.x, asteroid.y) <= hit_radius * hit_radius then
+                        bullet.dead = true
+                        self:split_asteroid(asteroid, false)
+                        break
+                    end
+                end
+            end
+        end
+        if self.ship and not bullet.dead and self.ship.invuln_timer <= 0 then
+            local hit_radius = bullet.radius + SHIP_RADIUS
+            if wrapped_dist_sq(bullet.x, bullet.y, self.ship.x, self.ship.y) <= hit_radius * hit_radius then
+                bullet.dead = true
+                self:destroy_ship(self.ship)
+            end
+        end
+    end
+
+    if self.ship and self.ship.invuln_timer <= 0 then
+        for asteroid in all(self.asteroids) do
+            if not asteroid.dead then
+                local hit_radius = SHIP_RADIUS + asteroid.radius
+                if wrapped_dist_sq(self.ship.x, self.ship.y, asteroid.x, asteroid.y) <= hit_radius * hit_radius then
+                    self:destroy_ship(self.ship)
+                    break
+                end
+            end
+        end
+    end
+
+    for ufo in all(self.ufos) do
+        if not ufo.dead then
+            for asteroid in all(self.asteroids) do
+                if not asteroid.dead then
+                    local hit_radius = ufo.radius + asteroid.radius
+                    if dist_sq(ufo.x, ufo.y, asteroid.x, asteroid.y) <= hit_radius * hit_radius then
+                        ufo.dead = true
+                        self:destroy_asteroid_without_split(asteroid)
+                        add_object(self.effects, Explosion.new(ufo.x, ufo.y, 0))
+                        break
+                    end
+                end
+            end
+
+            if self.ship and self.ship.invuln_timer <= 0 then
+                local ship_hit_radius = ufo.radius + SHIP_RADIUS
+                if dist_sq(ufo.x, ufo.y, self.ship.x, self.ship.y) <= ship_hit_radius * ship_hit_radius then
+                    self:destroy_ufo(ufo, false)
+                    self:destroy_ship(self.ship)
+                end
+            end
+        end
+    end
+    end
+
+function GameScreen:purge_dead()
+    remove_dead(self.asteroids)
+    remove_dead(self.bullets)
+    remove_dead(self.enemy_bullets)
+    remove_dead(self.ufos)
+    remove_dead(self.effects)
+    if self:get_active_ufo_count() == 0 then
+        self:set_ufo_sound_active(false)
+    end
+    end
 
 function GameScreen:update()
-    local dt = GAME_DT
-    local restart_pressed = buttonWasPressed(BUTTON_X)
-    local fire_pressed = buttonWasPressed(BUTTON_O)
+    local dt = FIXED_DT
+    self.prompt_timer += dt
 
-    if self.game_over then
-        self:update_objects(self.effects, dt)
-        self:prune_dead(self.effects)
-        self:update_ufo_audio(dt)
+    if self.mode == "attract" then
+        self:update_collection(self.asteroids, dt)
+        self:update_collection(self.effects, dt)
+        self:purge_dead()
         self:update_cadence(dt)
-        if restart_pressed then
-            self.isDone = true
-            self:stop_channel(0)
-            self:stop_channel(1)
-            self:stop_channel(2)
-            self:stop_channel(3)
+        if buttonWasPressed(BUTTON_X) then
+            self:start_game()
         end
         return
     end
 
     if self.ship then
-        self.ship:update(dt, self, fire_pressed)
+        self.ship:update(dt)
+    else
+        self:set_thrust_sound_active(false)
     end
 
-    self:update_objects(self.asteroids, dt)
-    self:update_objects(self.bullets, dt)
-    self:update_objects(self.enemyBullets, dt)
-    self:update_objects(self.ufos, dt)
-    self:update_objects(self.effects, dt)
-
+    self:update_collection(self.asteroids, dt)
+    self:update_collection(self.bullets, dt)
+    self:update_collection(self.enemy_bullets, dt)
+    self:update_collection(self.ufos, dt)
+    self:update_collection(self.effects, dt)
     self:handle_collisions()
-
-    self:prune_dead(self.asteroids)
-    self:prune_dead(self.bullets)
-    self:prune_dead(self.enemyBullets)
-    self:prune_dead(self.ufos)
-    self:prune_dead(self.effects)
-
-    self:handle_ship_respawn(dt)
-    self:update_wave_state(dt)
+    self:purge_dead()
+    self:update_respawn(dt)
+    self:update_wave_progress(dt)
     self:update_ufo_spawns(dt)
-    self:update_thrust_audio(dt)
-    self:update_ufo_audio(dt)
     self:update_cadence(dt)
 
-    if self.awaiting_game_over and #self.effects == 0 then
-        self.awaiting_game_over = false
-        self.game_over = true
-        self:stop_channel(0)
-        self:stop_channel(1)
+    if self.mode == "game_over" then
+        self.game_over_timer -= dt
+        if self.game_over_timer <= 0 then
+            self:reset_attract_mode()
+        end
     end
-end
+    end
 
 function GameScreen:draw_lives()
-    local altitude = 6
-    local half_base = SHIP_HALF_BASE * (altitude / SHIP_ALTITUDE)
     for i = 1, self.lives do
-        draw_triangle(8 + (i - 1) * 10, 8, 0.25, altitude, half_base, WHITE)
+        local icon = Ship.new(self, 8 + (i - 1) * 10, 8, 0)
+        icon.angle = 0.25
+        local points = icon:get_points(0.6)
+        draw_triangle_outline(points[1], points[2], points[3], points[4], points[5], points[6], WHITE)
     end
-end
+    end
 
 function GameScreen:draw_score()
-    local text = tostring(self.score)
-    print(text, SCREEN_SIZE - #text * 4 - 2, 2, WHITE)
-end
-
-function GameScreen:draw_respawn_notice()
-    if not self.ship and self.lives > 0 and not self.game_over then
-        print("respawning", 42, 60, LIGHT_GRAY)
+    local score_text = tostr(self.score)
+    print(score_text, SCREEN_SIZE - #score_text * 4 - 2, 4, WHITE)
     end
-end
+
+function GameScreen:draw_title_overlay()
+    local title = "aisteroids"
+    local total_width = #title * TITLE_LETTER_WIDTH + (#title - 1) * TITLE_SPACING
+    local x = flr((SCREEN_SIZE - total_width) / 2)
+    for i = 1, #title do
+        draw_title_letter(sub(title, i, i), x + (i - 1) * (TITLE_LETTER_WIDTH + TITLE_SPACING), TITLE_Y, WHITE)
+    end
+    if flr(self.prompt_timer * 2) % 2 == 0 then
+        print("press x to start", 37, 104, WHITE)
+    end
+    end
+
+function GameScreen:draw_game_over()
+    print("game over", 43, 60, WHITE)
+    end
 
 function GameScreen:draw()
     cls(BLACK)
 
-    for i = 1, #self.asteroids do
-        self.asteroids[i]:draw()
+    for asteroid in all(self.asteroids) do
+        asteroid:draw()
     end
-    for i = 1, #self.bullets do
-        self.bullets[i]:draw()
+    for bullet in all(self.bullets) do
+        bullet:draw()
     end
-    for i = 1, #self.enemyBullets do
-        self.enemyBullets[i]:draw()
+    for bullet in all(self.enemy_bullets) do
+        bullet:draw()
     end
-    for i = 1, #self.ufos do
-        self.ufos[i]:draw()
+    for ufo in all(self.ufos) do
+        ufo:draw()
     end
-    for i = 1, #self.effects do
-        self.effects[i]:draw()
-    end
-
     if self.ship then
         self.ship:draw()
     end
-
-    self:draw_lives()
-    self:draw_score()
-    self:draw_respawn_notice()
-
-    if self.wave_timer > 0 and #self.asteroids == 0 then
-        print("wave clear", 44, 54, LIGHT_GRAY)
+    for effect in all(self.effects) do
+        effect:draw()
     end
 
-    if self.game_over then
-        print("game over", 44, 54, RED)
-        print("press ❎", 48, 64, LIGHT_GRAY)
+    if self.mode ~= "attract" then
+        self:draw_lives()
+        self:draw_score()
     end
-end
+
+    if self.mode == "attract" then
+        self:draw_title_overlay()
+    elseif self.mode == "game_over" then
+        self:draw_game_over()
+    end
+    end
