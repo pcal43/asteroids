@@ -146,7 +146,7 @@ function Ship:fire()
 		fx * PLAYER_BULLET_SPEED,
 		fy * PLAYER_BULLET_SPEED,
 		PLAYER_BULLET_RADIUS,
-		ORANGE,
+		COLOR_PLAYER_BULLET,
 		"player",
 		PLAYER_BULLET_MAX_DISTANCE
 	)
@@ -173,9 +173,9 @@ function Ship:draw()
 	local rx2 = bx - rx * base_half
 	local ry2 = by - ry * base_half
 
-	line(nx, ny, lx, ly, WHITE)
-	line(nx, ny, rx2, ry2, WHITE)
-	line(lx, ly, rx2, ry2, WHITE)
+	line(nx, ny, lx, ly, COLOR_SHIP)
+	line(nx, ny, rx2, ry2, COLOR_SHIP)
+	line(lx, ly, rx2, ry2, COLOR_SHIP)
 
 	if self.thrusting then
 		local back_x = self.x - fx * (altitude_half + 1)
@@ -188,9 +188,9 @@ function Ship:draw()
 		local b1_y = back_y + ry * (side * 0.5)
 		local b2_x = back_x - rx * (side * 0.5)
 		local b2_y = back_y - ry * (side * 0.5)
-		line(tip_x, tip_y, b1_x, b1_y, RED)
-		line(tip_x, tip_y, b2_x, b2_y, RED)
-		line(b1_x, b1_y, b2_x, b2_y, RED)
+		line(tip_x, tip_y, b1_x, b1_y, COLOR_SHIP_THRUST)
+		line(tip_x, tip_y, b2_x, b2_y, COLOR_SHIP_THRUST)
+		line(b1_x, b1_y, b2_x, b2_y, COLOR_SHIP_THRUST)
 	end
 end
 
@@ -238,7 +238,7 @@ function Asteroid:update(dt)
 end
 
 function Asteroid:draw()
-	draw_rotated_polygon(self.points, self.x, self.y, self.angle, WHITE)
+	draw_rotated_polygon(self.points, self.x, self.y, self.angle, COLOR_ASTEROID)
 end
 
 Bullet = {}
@@ -322,10 +322,10 @@ function UFO:draw()
 	local x2 = self.x + hw
 	local y1 = self.y - hh
 	local y2 = self.y + hh
-	line(x1, y1, x2, y1, GREEN)
-	line(x2, y1, x2, y2, GREEN)
-	line(x2, y2, x1, y2, GREEN)
-	line(x1, y2, x1, y1, GREEN)
+	line(x1, y1, x2, y1, COLOR_UFO)
+	line(x2, y1, x2, y2, COLOR_UFO)
+	line(x2, y2, x1, y2, COLOR_UFO)
+	line(x1, y2, x1, y1, COLOR_UFO)
 end
 
 Explosion = {}
@@ -357,12 +357,12 @@ function Explosion:draw()
 	local p = clamp(self.t / EXPLOSION_DURATION, 0, 1)
 	local r = EXPLOSION_RADIUS_START + (EXPLOSION_RADIUS_END - EXPLOSION_RADIUS_START) * p
 	local l = EXPLOSION_LINE_START + (EXPLOSION_LINE_END - EXPLOSION_LINE_START) * p
-	circ(self.x, self.y, r, RED)
+	circ(self.x, self.y, r, COLOR_EXPLOSION)
 	for i = 1, #self.rays do
 		local a = self.rays[i]
 		local x2 = self.x + cos(a) * l
 		local y2 = self.y + sin(a) * l
-		line(self.x, self.y, x2, y2, RED)
+		line(self.x, self.y, x2, y2, COLOR_EXPLOSION)
 	end
 end
 
@@ -444,9 +444,9 @@ local function draw_life_icon(x, y)
 	local rx2 = bx - rx * base_half
 	local ry2 = by - ry * base_half
 
-	line(nx, ny, lx, ly, WHITE)
-	line(nx, ny, rx2, ry2, WHITE)
-	line(lx, ly, rx2, ry2, WHITE)
+	line(nx, ny, lx, ly, COLOR_LIFE_ICON)
+	line(nx, ny, rx2, ry2, COLOR_LIFE_ICON)
+	line(lx, ly, rx2, ry2, COLOR_LIFE_ICON)
 end
 
 function GameScreen.new()
@@ -468,6 +468,7 @@ function GameScreen.new()
 		next_extra_life_score = EXTRA_LIFE_SCORE_STEP,
 		respawn_timer = -1,
 		game_over = false,
+		game_over_timer = -1,
 		ufo_spawn_timer = rand_range(UFO_SPAWN_MIN_DELAY, UFO_SPAWN_MAX_DELAY),
 		ufo_spawn_pending = false,
 		ufo_loop_on = false,
@@ -590,6 +591,7 @@ function GameScreen:destroy_ship()
 	self.lives  = self.lives  - 1
 	if self.lives <= 0 then
 		self.game_over = true
+		self.game_over_timer = 0
 		self.respawn_timer = -1
 	end
 	if self.thrust_sound_on then
@@ -705,7 +707,7 @@ function GameScreen:fire_ufo_bullet(ufo)
 	local a = rnd(1)
 	local vx = cos(a) * UFO_BULLET_SPEED
 	local vy = sin(a) * UFO_BULLET_SPEED
-	add(self.enemy_bullets, Bullet.new(ufo.x, ufo.y, vx, vy, UFO_BULLET_RADIUS, GREEN, "ufo", nil))
+	add(self.enemy_bullets, Bullet.new(ufo.x, ufo.y, vx, vy, UFO_BULLET_RADIUS, COLOR_UFO_BULLET, "ufo", nil))
 	sfx(SFX_FIRE, SFX_CHANNEL_FX)
 end
 
@@ -888,7 +890,47 @@ function GameScreen:update_attract(dt)
 	end
 end
 
+function GameScreen:reset_to_attract()
+	if self.ufo_loop_on then
+		sfx(-1, SFX_CHANNEL_UFO)
+		self.ufo_loop_on = false
+	end
+	if self.thrust_sound_on then
+		sfx(-1, SFX_CHANNEL_THRUST)
+		self.thrust_sound_on = false
+	end
+	sfx(-1, SFX_CHANNEL_CADENCE)
+	self.state = "attract"
+	self.flash_timer = 0
+	self.ship = nil
+	self.bullets = {}
+	self.enemy_bullets = {}
+	self.ufos = {}
+	self.explosions = {}
+	self.wave_index = 1
+	self.wave_start_asteroid_count = 0
+	self.wave_clear_timer = -1
+	self.score = 0
+	self.lives = INITIAL_LIVES
+	self.next_extra_life_score = EXTRA_LIFE_SCORE_STEP
+	self.respawn_timer = -1
+	self.game_over = false
+	self.game_over_timer = -1
+	self.ufo_spawn_timer = rand_range(UFO_SPAWN_MIN_DELAY, UFO_SPAWN_MAX_DELAY)
+	self.ufo_spawn_pending = false
+	self.cadence_timer = 0
+	self.cadence_flip = false
+	self:spawn_wave(true)
+end
+
 function GameScreen:update_play(dt)
+	if self.game_over then
+		self.game_over_timer = self.game_over_timer + dt
+		if self.game_over_timer >= GAME_OVER_PROMPT_DELAY and buttonWasPressed(BUTTON_X) then
+			self:reset_to_attract()
+			return
+		end
+	end
 	if self.ship then
 		self.ship:update(dt)
 	end
@@ -912,27 +954,32 @@ function GameScreen:update()
 end
 
 function GameScreen:draw_hud()
-	print("score "..flr(self.score), HUD_SCORE_X, HUD_SCORE_Y, WHITE)
+	print("score "..flr(self.score), HUD_SCORE_X, HUD_SCORE_Y, COLOR_HUD_TEXT)
 	for i = 1, max(0, self.lives) do
 		draw_life_icon(HUD_LIVES_X + (i - 1) * HUD_LIVES_SPACING, HUD_LIVES_Y)
 	end
 	if self.game_over then
-		print("game over", 46, 62, RED)
+		print("game over", 46, 62, COLOR_GAMEOVER_TEXT)
+		if self.game_over_timer >= GAME_OVER_PROMPT_DELAY then
+			if (self.game_over_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
+				print("press x to continue", 30, 74, COLOR_HUD_TEXT)
+			end
+		end
 	end
 end
 
 function GameScreen:draw_attract_overlay()
-	draw_title_text(TITLE_X, TITLE_Y, TITLE_SCALE, WHITE)
+	draw_title_text(TITLE_X, TITLE_Y, TITLE_SCALE, COLOR_TITLE)
 	if (self.flash_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
-		print("press x to start", 34, 106, WHITE)
+		print("press x to start", 34, 106, COLOR_HUD_TEXT)
 	end
 	if VERSION_STRING then
-		print(VERSION_STRING, 1, 121, DARK_GRAY)
+		print(VERSION_STRING, VERSION_X, VERSION_Y, COLOR_VERSION)
 	end
 end
 
 function GameScreen:draw()
-	cls(BLACK)
+	cls(COLOR_BACKGROUND)
 
 	for i = 1, #self.asteroids do
 		self.asteroids[i]:draw()
