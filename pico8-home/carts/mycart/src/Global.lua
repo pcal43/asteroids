@@ -76,7 +76,8 @@
 --[[const]] NEWHIGHSCORE_Y = 72
 
 --[[const]] INITIAL_WAVE_ASTEROIDS = 6
---[[const]] MAX_WAVE_ASTEROIDS = 10
+--[[const]] ASTEROID_INCREMENT = 2
+--[[const]] MAX_WAVE_ASTEROIDS = 20
 --[[const]] NEXT_WAVE_DELAY = 3
 --[[const]] INITIAL_CENTER_SAFE_DISTANCE = 20
 --[[const]] WAVE_SPAWN_SAFE_DISTANCE_FROM_SHIP = 30

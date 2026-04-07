@@ -501,7 +501,7 @@ function GameScreen.new()
 end
 
 function GameScreen:get_wave_large_count()
-	return min(MAX_WAVE_ASTEROIDS, INITIAL_WAVE_ASTEROIDS + self.wave_index - 1)
+	return min(MAX_WAVE_ASTEROIDS, ASTEROID_INCREMENT * self.wave_index)
 end
 
 function GameScreen:spawn_wave(is_initial)
