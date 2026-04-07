@@ -11,7 +11,6 @@ __lua__
 
 #include src/Global.lua
 
-#include src/TitleScreen.lua
 #include src/GameScreen.lua
 #include src/Controller.lua
 __sfx__

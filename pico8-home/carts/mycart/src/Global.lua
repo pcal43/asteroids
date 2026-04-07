@@ -17,7 +17,7 @@
 --[[const]] SHIP_START_ANGLE = 0.25
 --[[const]] SHIP_ROTATE_DEG_PER_SEC = 180
 --[[const]] SHIP_ROTATE_TURNS_PER_SEC = SHIP_ROTATE_DEG_PER_SEC / 360
---[[const]] SHIP_THRUST_ACCEL = 20
+--[[const]] SHIP_THRUST_ACCEL = 30
 --[[const]] SHIP_DAMP_PER_SEC = 1
 --[[const]] SHIP_MAX_SPEED = 20
 --[[const]] SHIP_COLLISION_RADIUS = 4
@@ -25,21 +25,21 @@
 --[[const]] SHIP_NOSE_HALF_ANGLE_TAN = 0.41421356237
 --[[const]] SHIP_THRUST_FLAME_SIDE = 4
 
---[[const]] PLAYER_BULLET_SPEED = 20
+--[[const]] PLAYER_BULLET_SPEED = 40
 --[[const]] PLAYER_BULLET_MAX_DISTANCE = 64
---[[const]] PLAYER_BULLET_RADIUS = 2
+--[[const]] PLAYER_BULLET_RADIUS = 1
 --[[const]] PLAYER_FIRE_COOLDOWN = 0.2
 
---[[const]] UFO_BULLET_SPEED = 10
---[[const]] UFO_BULLET_RADIUS = 2
+--[[const]] UFO_BULLET_SPEED = 40
+--[[const]] UFO_BULLET_RADIUS = 1
 --[[const]] UFO_FIRE_MIN_DELAY = 1
 --[[const]] UFO_FIRE_MAX_DELAY = 2
 
 --[[const]] INITIAL_LIVES = 3
---[[const]] EXTRA_LIFE_SCORE_STEP = 20000
+--[[const]] EXTRA_LIFE_SCORE_STEP = 10000
 --[[const]] RESPAWN_DELAY = 3
---[[const]] RESPAWN_INVULN_TIME = 2
---[[const]] RESPAWN_SAFE_DISTANCE = 15
+--[[const]] RESPAWN_INVULN_TIME = 5
+--[[const]] RESPAWN_SAFE_DISTANCE = 5
 
 --[[const]] INITIAL_WAVE_ASTEROIDS = 6
 --[[const]] MAX_WAVE_ASTEROIDS = 10

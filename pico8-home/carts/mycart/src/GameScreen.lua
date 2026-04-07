@@ -595,7 +595,7 @@ function GameScreen:update_respawn(dt)
 	if self.respawn_timer < 0 then return end
 
 	if self.respawn_timer > 0 then
-		self.respawn_timer  = self.respawn_timer  - dt
+		self.respawn_timer = max(0, self.respawn_timer - dt)
 		return
 	end
 
