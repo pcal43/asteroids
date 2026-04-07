@@ -509,13 +509,32 @@ function GameScreen:spawn_wave(is_initial)
 	self.cadence_timer = 0
 end
 
+function GameScreen:find_spawn_position()
+	for _ = 1, 200 do
+		local x = SPAWN_EDGE_MARGIN + rnd(SCREEN_W - SPAWN_EDGE_MARGIN * 2)
+		local y = SPAWN_EDGE_MARGIN + rnd(SCREEN_H - SPAWN_EDGE_MARGIN * 2)
+		local ok = true
+		for i = 1, #self.asteroids do
+			local a = self.asteroids[i]
+			if wrapped_distance(x, y, a.x, a.y) < (SPAWN_ASTEROID_CLEARANCE + a.radius) then
+				ok = false
+				break
+			end
+		end
+		if ok then return x, y end
+	end
+	return nil
+end
+
 function GameScreen:begin_play()
 	self.state = "play"
-	self.ship = Ship.new(SHIP_START_X, SHIP_START_Y)
+	local sx, sy = self:find_spawn_position()
+	if not sx then sx = SHIP_START_X; sy = SHIP_START_Y end
+	self.ship = Ship.new(sx, sy)
 	self.ship.vx = 0
 	self.ship.vy = 0
 	self.ship.angle = SHIP_START_ANGLE
-	self.ship.invuln_timer = 0
+	self.ship.invuln_timer = RESPAWN_INVULN_TIME
 	self.cadence_timer = 0
 	self.cadence_flip = false
 end
@@ -579,16 +598,6 @@ function GameScreen:destroy_ship()
 	end
 end
 
-function GameScreen:can_respawn_now()
-	for i = 1, #self.asteroids do
-		local a = self.asteroids[i]
-		if wrapped_distance(SHIP_START_X, SHIP_START_Y, a.x, a.y) < (RESPAWN_SAFE_DISTANCE + a.radius) then
-			return false
-		end
-	end
-	return true
-end
-
 function GameScreen:update_respawn(dt)
 	if self.game_over then return end
 	if self.ship then return end
@@ -599,12 +608,15 @@ function GameScreen:update_respawn(dt)
 		return
 	end
 
-	if self.lives > 0 and self:can_respawn_now() then
-		self.ship = Ship.new(SHIP_START_X, SHIP_START_Y)
-		self.ship.invuln_timer = RESPAWN_INVULN_TIME
-		self.ship.vx = 0
-		self.ship.vy = 0
-		self.respawn_timer = -1
+	if self.lives > 0 then
+		local sx, sy = self:find_spawn_position()
+		if sx then
+			self.ship = Ship.new(sx, sy)
+			self.ship.invuln_timer = RESPAWN_INVULN_TIME
+			self.ship.vx = 0
+			self.ship.vy = 0
+			self.respawn_timer = -1
+		end
 	end
 end
 
@@ -900,9 +912,9 @@ function GameScreen:update()
 end
 
 function GameScreen:draw_hud()
-	print("score "..flr(self.score), 78, 2, WHITE)
+	print("score "..flr(self.score), HUD_SCORE_X, HUD_SCORE_Y, WHITE)
 	for i = 1, max(0, self.lives) do
-		draw_life_icon(7 + (i - 1) * 7, 8)
+		draw_life_icon(HUD_LIVES_X + (i - 1) * HUD_LIVES_SPACING, HUD_LIVES_Y)
 	end
 	if self.game_over then
 		print("game over", 46, 62, RED)

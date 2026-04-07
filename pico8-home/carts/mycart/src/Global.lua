@@ -39,7 +39,8 @@
 --[[const]] EXTRA_LIFE_SCORE_STEP = 10000
 --[[const]] RESPAWN_DELAY = 3
 --[[const]] RESPAWN_INVULN_TIME = 5
---[[const]] RESPAWN_SAFE_DISTANCE = 5
+--[[const]] SPAWN_EDGE_MARGIN = 16
+--[[const]] SPAWN_ASTEROID_CLEARANCE = 16
 
 --[[const]] INITIAL_WAVE_ASTEROIDS = 6
 --[[const]] MAX_WAVE_ASTEROIDS = 10
@@ -79,6 +80,12 @@
 --[[const]] EXPLOSION_RADIUS_END = 10
 --[[const]] EXPLOSION_LINE_START = 2
 --[[const]] EXPLOSION_LINE_END = 12
+
+--[[const]] HUD_SCORE_X = 78
+--[[const]] HUD_SCORE_Y = 2
+--[[const]] HUD_LIVES_X = 2
+--[[const]] HUD_LIVES_Y = 5
+--[[const]] HUD_LIVES_SPACING = 7
 
 --[[const]] SHIP_INVULN_BLINK_HZ = 12
 
