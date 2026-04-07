@@ -464,6 +464,9 @@ local function draw_life_icon(x, y)
 end
 
 function GameScreen.new()
+	cartdata(HIGHSCORE_CARTDATA_ID)
+	local saved = dget(HIGHSCORE_CARTDATA_SLOT)
+	local local_highscore = saved > 0 and saved or HIGHSCORE_DEFAULT
 	local self = {
 		isDone = false,
 		state = "attract",
@@ -483,6 +486,8 @@ function GameScreen.new()
 		respawn_timer = -1,
 		game_over = false,
 		game_over_timer = -1,
+		high_score = local_highscore,
+		is_new_highscore = false,
 		ufo_spawn_timer = rand_range(UFO_SPAWN_MIN_DELAY, UFO_SPAWN_MAX_DELAY),
 		ufo_spawn_pending = false,
 		ufo_loop_on = false,
@@ -607,6 +612,11 @@ function GameScreen:destroy_ship()
 		self.game_over = true
 		self.game_over_timer = 0
 		self.respawn_timer = -1
+		if self.score > self.high_score then
+			self.high_score = self.score
+			self.is_new_highscore = true
+			dset(HIGHSCORE_CARTDATA_SLOT, self.high_score)
+		end
 	end
 	if self.thrust_sound_on then
 		sfx(-1, SFX_CHANNEL_THRUST)
@@ -931,6 +941,7 @@ function GameScreen:reset_to_attract()
 	self.respawn_timer = -1
 	self.game_over = false
 	self.game_over_timer = -1
+	self.is_new_highscore = false
 	self.ufo_spawn_timer = rand_range(UFO_SPAWN_MIN_DELAY, UFO_SPAWN_MAX_DELAY)
 	self.ufo_spawn_pending = false
 	self.cadence_timer = 0
@@ -975,6 +986,9 @@ function GameScreen:draw_hud()
 	end
 	if self.game_over then
 		print("game over", 46, 62, COLOR_GAMEOVER_TEXT)
+		if self.is_new_highscore then
+			print("new high score!", NEWHIGHSCORE_X, NEWHIGHSCORE_Y, COLOR_NEW_HIGHSCORE)
+		end
 		if self.game_over_timer >= GAME_OVER_PROMPT_DELAY then
 			if (self.game_over_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
 				print("press x to continue", PROMPT_CONTINUE_X, PROMPT_CONTINUE_Y, COLOR_HUD_TEXT)
@@ -985,6 +999,7 @@ end
 
 function GameScreen:draw_attract_overlay()
 	draw_title_text(TITLE_X, TITLE_Y, TITLE_SCALE, COLOR_TITLE)
+	print("high score  "..flr(self.high_score), HIGHSCORE_DISPLAY_X, HIGHSCORE_DISPLAY_Y, COLOR_HIGHSCORE)
 	if (self.flash_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
 		print("press x to start", PROMPT_START_X, PROMPT_START_Y, COLOR_HUD_TEXT)
 	end

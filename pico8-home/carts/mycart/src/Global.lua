@@ -20,14 +20,16 @@
 
 --[[const]] COLOR_BACKGROUND = BLACK
 --[[const]] COLOR_SHIP = WHITE
---[[const]] COLOR_SHIP_THRUST = ORANGE
---[[const]] COLOR_ASTEROID = WHITE
---[[const]] COLOR_PLAYER_BULLET = ORANGE
---[[const]] COLOR_UFO = GREEN
---[[const]] COLOR_UFO_BULLET = GREEN
---[[const]] COLOR_EXPLOSION = RED
+--[[const]] COLOR_SHIP_THRUST = LIGHT_GRAY
+--[[const]] COLOR_ASTEROID = DARK_GRAY
+--[[const]] COLOR_PLAYER_BULLET = WHITE
+--[[const]] COLOR_UFO = WHITE
+--[[const]] COLOR_UFO_BULLET = WHITE
+--[[const]] COLOR_EXPLOSION = WHITE
 --[[const]] COLOR_HUD_TEXT = WHITE
---[[const]] COLOR_GAMEOVER_TEXT = RED
+--[[const]] COLOR_GAMEOVER_TEXT = LIGHT_GRAY
+--[[const]] COLOR_HIGHSCORE = LIGHT_GRAY
+--[[const]] COLOR_NEW_HIGHSCORE = WHITE
 --[[const]] COLOR_VERSION = DARK_GRAY
 --[[const]] COLOR_TITLE = WHITE
 --[[const]] COLOR_LIFE_ICON = WHITE
@@ -62,6 +64,14 @@
 --[[const]] GAME_OVER_PROMPT_DELAY = 3
 --[[const]] SPAWN_EDGE_MARGIN = 16
 --[[const]] SPAWN_ASTEROID_CLEARANCE = 16
+
+--[[const]] HIGHSCORE_DEFAULT = 1000
+--[[const]] HIGHSCORE_CARTDATA_ID = "pcal-asteroids"
+--[[const]] HIGHSCORE_CARTDATA_SLOT = 0
+--[[const]] HIGHSCORE_DISPLAY_X = 34
+--[[const]] HIGHSCORE_DISPLAY_Y = 88
+--[[const]] NEWHIGHSCORE_X = 27
+--[[const]] NEWHIGHSCORE_Y = 72
 
 --[[const]] INITIAL_WAVE_ASTEROIDS = 6
 --[[const]] MAX_WAVE_ASTEROIDS = 10
@@ -113,8 +123,8 @@
 
 --[[const]] SHIP_INVULN_BLINK_HZ = 12
 
---[[const]] CADENCE_INTERVAL_SLOW = 2
---[[const]] CADENCE_INTERVAL_FAST = 0.5
+--[[const]] CADENCE_INTERVAL_SLOW = 1
+--[[const]] CADENCE_INTERVAL_FAST = 0.25
 
 --[[const]] SFX_CADENCE_A = 0
 --[[const]] SFX_CADENCE_B = 1
