@@ -54,11 +54,6 @@
 --[[const]] PLAYER_BULLET_RADIUS = 1
 --[[const]] PLAYER_FIRE_COOLDOWN = 0.2
 
---[[const]] UFO_BULLET_SPEED = 50
---[[const]] UFO_BULLET_RADIUS = 1
---[[const]] UFO_FIRE_MIN_DELAY = 1
---[[const]] UFO_FIRE_MAX_DELAY = 2
-
 --[[const]] INITIAL_LIVES = 3
 --[[const]] EXTRA_LIFE_SCORE_STEP = 10000
 --[[const]] RESPAWN_DELAY = 3
@@ -111,6 +106,12 @@
 --[[const]] UFO_SPAWN_SAFE_DISTANCE = 20
 --[[const]] UFO_MIN_Y = 12
 --[[const]] UFO_MAX_Y = 116
+
+--[[const]] UFO_BULLET_SPEED = 50
+--[[const]] UFO_BULLET_RADIUS = 1
+--[[const]] UFO_BULLET_MAX_DISTANCE = 64
+--[[const]] UFO_FIRE_MIN_DELAY = 1
+--[[const]] UFO_FIRE_MAX_DELAY = 2
 
 --[[const]] EXPLOSION_DURATION = 0.5
 --[[const]] EXPLOSION_RADIUS_START = 1

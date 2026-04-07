@@ -732,7 +732,7 @@ function GameScreen:fire_ufo_bullet(ufo)
 	local a = rnd(1)
 	local vx = cos(a) * UFO_BULLET_SPEED
 	local vy = sin(a) * UFO_BULLET_SPEED
-	add(self.enemy_bullets, Bullet.new(ufo.x, ufo.y, vx, vy, UFO_BULLET_RADIUS, COLOR_UFO_BULLET, "ufo", nil))
+	add(self.enemy_bullets, Bullet.new(ufo.x, ufo.y, vx, vy, UFO_BULLET_RADIUS, COLOR_UFO_BULLET, "ufo", UFO_BULLET_MAX_DISTANCE))
 	sfx(SFX_FIRE, SFX_CHANNEL_FX)
 end
 
