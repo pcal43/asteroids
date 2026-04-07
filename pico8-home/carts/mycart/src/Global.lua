@@ -134,7 +134,7 @@
 --[[const]] EXPLOSION_LINE_START = 2
 --[[const]] EXPLOSION_LINE_END = 12
 
---[[const]] HUD_SCORE_X = 78
+--[[const]] HUD_SCORE_X = 110
 --[[const]] HUD_SCORE_Y = 2
 --[[const]] HUD_LIVES_X = 2
 --[[const]] HUD_LIVES_Y = 5

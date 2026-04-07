@@ -316,6 +316,8 @@ function UFO:update(dt)
 	if not self.alive then return end
 	self.x  = self.x  + self.vx * dt
 	self.y  = self.y  + self.vy * dt
+	if self.y < 0 then self.y = self.y + SCREEN_H
+	elseif self.y >= SCREEN_H then self.y = self.y - SCREEN_H end
 	self.steer_timer = self.steer_timer - dt
 	if self.steer_timer <= 0 then
 		local r = flr(rnd(3))
@@ -1008,7 +1010,7 @@ function GameScreen:update()
 end
 
 function GameScreen:draw_hud()
-	print("score "..flr(self.score), HUD_SCORE_X, HUD_SCORE_Y, COLOR_HUD_TEXT)
+	print(flr(self.score), HUD_SCORE_X, HUD_SCORE_Y, COLOR_HUD_TEXT)
 	for i = 1, max(0, self.lives) do
 		draw_life_icon(HUD_LIVES_X + (i - 1) * HUD_LIVES_SPACING, HUD_LIVES_Y)
 	end
