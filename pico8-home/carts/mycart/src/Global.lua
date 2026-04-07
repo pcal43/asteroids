@@ -17,6 +17,8 @@
 --[[const]] PROMPT_CONTINUE_Y = 106
 --[[const]] VERSION_X = 110
 --[[const]] VERSION_Y = 121
+--[[const]] BYLINE_X = 1
+--[[const]] BYLINE_Y = 121
 
 --[[const]] COLOR_BACKGROUND = BLACK
 --[[const]] COLOR_SHIP = WHITE
@@ -104,7 +106,7 @@
 --[[const]] UFO_DOME_Y_OFFSET = 3
 --[[const]] UFO_COLLISION_RADIUS = 5
 --[[const]] UFO_SPAWN_MIN_DELAY = 15
---[[const]] UFO_SPAWN_MAX_DELAY = 30
+--[[const]] UFO_SPAWN_MAX_DELAY = 25
 --[[const]] UFO_SPAWN_SAFE_DISTANCE = 20
 --[[const]] UFO_MIN_Y = 12
 --[[const]] UFO_MAX_Y = 116

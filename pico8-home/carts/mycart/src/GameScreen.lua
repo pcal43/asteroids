@@ -429,7 +429,7 @@ local function draw_title_letter(ch, x, y, s, c)
 end
 
 local function draw_title_text(x, y, s, c)
-	local label = "AISTEROIDS"
+	local label = "ASTEROIDS"
 	local step = 6 * s
 	for i = 1, #label do
 		draw_title_letter(sub(label, i, i), x + (i - 1) * step, y, s, c)
@@ -1006,6 +1006,7 @@ function GameScreen:draw_attract_overlay()
 	if VERSION_STRING then
 		print(VERSION_STRING, VERSION_X, VERSION_Y, COLOR_VERSION)
 	end
+	print("by pcal", BYLINE_X, BYLINE_Y, COLOR_VERSION)
 end
 
 function GameScreen:draw()
