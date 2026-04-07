@@ -316,16 +316,30 @@ function UFO:is_offscreen()
 end
 
 function UFO:draw()
-	local hw = UFO_WIDTH * 0.5
-	local hh = UFO_HEIGHT * 0.5
-	local x1 = self.x - hw
-	local x2 = self.x + hw
-	local y1 = self.y - hh
-	local y2 = self.y + hh
-	line(x1, y1, x2, y1, COLOR_UFO)
-	line(x2, y1, x2, y2, COLOR_UFO)
-	line(x2, y2, x1, y2, COLOR_UFO)
-	line(x1, y2, x1, y1, COLOR_UFO)
+	-- lower rhombus (body)
+	local bx = self.x
+	local by = self.y
+	local bhw = UFO_WIDTH * 0.5
+	local bhh = UFO_HEIGHT * 0.5
+	local bl = bx - bhw
+	local br = bx + bhw
+	local bt = by - bhh
+	local bb = by + bhh
+	line(bl, by, bx - bhw * 0.3, bt, COLOR_UFO)
+	line(bx - bhw * 0.3, bt, bx + bhw * 0.3, bt, COLOR_UFO)
+	line(bx + bhw * 0.3, bt, br, by, COLOR_UFO)
+	line(br, by, bx + bhw * 0.3, bb, COLOR_UFO)
+	line(bx + bhw * 0.3, bb, bx - bhw * 0.3, bb, COLOR_UFO)
+	line(bx - bhw * 0.3, bb, bl, by, COLOR_UFO)
+	-- upper rhombus (dome)
+	local dhw = UFO_DOME_WIDTH * 0.5
+	local dhh = UFO_DOME_HEIGHT
+	local dy = by - UFO_DOME_Y_OFFSET
+	local dl = bx - dhw
+	local dr = bx + dhw
+	line(dl, dy, bx, dy - dhh, COLOR_UFO)
+	line(bx, dy - dhh, dr, dy, COLOR_UFO)
+	line(dr, dy, dl, dy, COLOR_UFO)
 end
 
 Explosion = {}
@@ -700,6 +714,7 @@ function GameScreen:remove_ufo(index)
 		sfx(-1, SFX_CHANNEL_UFO)
 		self.ufo_loop_on = false
 		self.ufo_spawn_timer = rand_range(UFO_SPAWN_MIN_DELAY, UFO_SPAWN_MAX_DELAY)
+		self.ufo_spawn_pending = false
 	end
 end
 
@@ -962,7 +977,7 @@ function GameScreen:draw_hud()
 		print("game over", 46, 62, COLOR_GAMEOVER_TEXT)
 		if self.game_over_timer >= GAME_OVER_PROMPT_DELAY then
 			if (self.game_over_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
-				print("press x to continue", 30, 74, COLOR_HUD_TEXT)
+				print("press x to continue", PROMPT_CONTINUE_X, PROMPT_CONTINUE_Y, COLOR_HUD_TEXT)
 			end
 		end
 	end
@@ -971,7 +986,7 @@ end
 function GameScreen:draw_attract_overlay()
 	draw_title_text(TITLE_X, TITLE_Y, TITLE_SCALE, COLOR_TITLE)
 	if (self.flash_timer % TITLE_FLASH_PERIOD) < TITLE_FLASH_ON_TIME then
-		print("press x to start", 34, 106, COLOR_HUD_TEXT)
+		print("press x to start", PROMPT_START_X, PROMPT_START_Y, COLOR_HUD_TEXT)
 	end
 	if VERSION_STRING then
 		print(VERSION_STRING, VERSION_X, VERSION_Y, COLOR_VERSION)
