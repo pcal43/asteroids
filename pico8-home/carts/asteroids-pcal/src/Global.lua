@@ -63,7 +63,7 @@
 --[[const]] SPAWN_ASTEROID_CLEARANCE = 16
 
 --[[const]] HIGHSCORE_DEFAULT = 1000
---[[const]] HIGHSCORE_CARTDATA_ID = "pcal-asteroids"
+--[[const]] HIGHSCORE_CARTDATA_ID = "asteroids-pcal"
 --[[const]] HIGHSCORE_CARTDATA_SLOT = 0
 --[[const]] HIGHSCORE_DISPLAY_X = 34
 --[[const]] HIGHSCORE_DISPLAY_Y = 88
