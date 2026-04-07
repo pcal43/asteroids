@@ -295,6 +295,7 @@ function UFO.new(x, y, dir, is_small)
 		dir = dir,
 		vx = dir * UFO_SPEED,
 		vy = 0,
+		steer_timer = rand_range(UFO_STEER_MIN_DELAY, UFO_STEER_MAX_DELAY),
 		width = w,
 		height = h,
 		dome_width = dw,
@@ -315,6 +316,12 @@ function UFO:update(dt)
 	if not self.alive then return end
 	self.x  = self.x  + self.vx * dt
 	self.y  = self.y  + self.vy * dt
+	self.steer_timer = self.steer_timer - dt
+	if self.steer_timer <= 0 then
+		local r = flr(rnd(3))
+		self.vy = (r == 0) and -UFO_VERT_SPEED or (r == 1) and UFO_VERT_SPEED or 0
+		self.steer_timer = rand_range(UFO_STEER_MIN_DELAY, UFO_STEER_MAX_DELAY)
+	end
 	self.fire_timer  = self.fire_timer  - dt
 	if self.fire_timer <= 0 then
 		self.fire_timer = rand_range(self.fire_min, self.fire_max)

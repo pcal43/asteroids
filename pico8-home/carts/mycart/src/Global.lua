@@ -96,12 +96,16 @@
 --[[const]] SCORE_UFO_SMALL = 1000
 
 --[[const]] UFO_SPEED = 15
+--[[const]] UFO_VERT_SPEED = 15
+--[[const]] UFO_STEER_MIN_DELAY = 1
+--[[const]] UFO_STEER_MAX_DELAY = 3
 --[[const]] UFO_WIDTH = 14
 --[[const]] UFO_HEIGHT = 5
 --[[const]] UFO_DOME_WIDTH = 7
 --[[const]] UFO_DOME_HEIGHT = 3
 --[[const]] UFO_DOME_Y_OFFSET = 3
---[[const]] UFO_COLLISION_RADIUS = 5--[[const]] UFO_SMALL_WIDTH = 7
+--[[const]] UFO_COLLISION_RADIUS = 5
+--[[const]] UFO_SMALL_WIDTH = 7
 --[[const]] UFO_SMALL_HEIGHT = 2
 --[[const]] UFO_SMALL_DOME_WIDTH = 4
 --[[const]] UFO_SMALL_DOME_HEIGHT = 2
