@@ -93,6 +93,7 @@
 --[[const]] SCORE_ASTEROID_MEDIUM = 50
 --[[const]] SCORE_ASTEROID_SMALL = 100
 --[[const]] SCORE_UFO = 500
+--[[const]] SCORE_UFO_SMALL = 1000
 
 --[[const]] UFO_SPEED = 15
 --[[const]] UFO_WIDTH = 14
@@ -100,7 +101,17 @@
 --[[const]] UFO_DOME_WIDTH = 7
 --[[const]] UFO_DOME_HEIGHT = 3
 --[[const]] UFO_DOME_Y_OFFSET = 3
---[[const]] UFO_COLLISION_RADIUS = 5
+--[[const]] UFO_COLLISION_RADIUS = 5--[[const]] UFO_SMALL_WIDTH = 7
+--[[const]] UFO_SMALL_HEIGHT = 2
+--[[const]] UFO_SMALL_DOME_WIDTH = 4
+--[[const]] UFO_SMALL_DOME_HEIGHT = 2
+--[[const]] UFO_SMALL_DOME_Y_OFFSET = 2
+--[[const]] UFO_SMALL_COLLISION_RADIUS = 3
+--[[const]] UFO_SMALL_FIRE_MIN_DELAY = 0.5
+--[[const]] UFO_SMALL_FIRE_MAX_DELAY = 1
+--[[const]] UFO_SMALL_SPAWN_ODDS_BASE = 0
+--[[const]] UFO_SMALL_SPAWN_ODDS_PER_WAVE = 20
+--[[const]] UFO_SMALL_SPAWN_ODDS_MAX = 80
 --[[const]] UFO_SPAWN_MIN_DELAY = 10
 --[[const]] UFO_SPAWN_MAX_DELAY = 20
 --[[const]] UFO_SPAWN_SAFE_DISTANCE = 20
@@ -136,6 +147,7 @@
 --[[const]] SFX_HIT = 3
 --[[const]] SFX_THRUST = 4
 --[[const]] SFX_UFO_LOOP = 5
+--[[const]] SFX_UFO_SMALL_LOOP = 7
 --[[const]] SFX_EXTRA_LIFE = 6
 
 --[[const]] SFX_CHANNEL_CADENCE = 0

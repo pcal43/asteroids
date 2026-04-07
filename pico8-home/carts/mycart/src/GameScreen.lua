@@ -280,15 +280,31 @@ end
 
 UFO = {}
 
-function UFO.new(x, y, dir)
+function UFO.new(x, y, dir, is_small)
+	local w    = is_small and UFO_SMALL_WIDTH          or UFO_WIDTH
+	local h    = is_small and UFO_SMALL_HEIGHT         or UFO_HEIGHT
+	local dw   = is_small and UFO_SMALL_DOME_WIDTH     or UFO_DOME_WIDTH
+	local dh   = is_small and UFO_SMALL_DOME_HEIGHT    or UFO_DOME_HEIGHT
+	local dyo  = is_small and UFO_SMALL_DOME_Y_OFFSET  or UFO_DOME_Y_OFFSET
+	local cr   = is_small and UFO_SMALL_COLLISION_RADIUS or UFO_COLLISION_RADIUS
+	local fmin = is_small and UFO_SMALL_FIRE_MIN_DELAY or UFO_FIRE_MIN_DELAY
+	local fmax = is_small and UFO_SMALL_FIRE_MAX_DELAY or UFO_FIRE_MAX_DELAY
 	local self = {
 		x = x,
 		y = y,
 		dir = dir,
 		vx = dir * UFO_SPEED,
 		vy = 0,
-		radius = UFO_COLLISION_RADIUS,
-		fire_timer = rand_range(UFO_FIRE_MIN_DELAY, UFO_FIRE_MAX_DELAY),
+		width = w,
+		height = h,
+		dome_width = dw,
+		dome_height = dh,
+		dome_y_offset = dyo,
+		radius = cr,
+		fire_min = fmin,
+		fire_max = fmax,
+		fire_timer = rand_range(fmin, fmax),
+		is_small = is_small and true or false,
 		alive = true
 	}
 	setmetatable(self, { __index = UFO })
@@ -301,14 +317,14 @@ function UFO:update(dt)
 	self.y  = self.y  + self.vy * dt
 	self.fire_timer  = self.fire_timer  - dt
 	if self.fire_timer <= 0 then
-		self.fire_timer = rand_range(UFO_FIRE_MIN_DELAY, UFO_FIRE_MAX_DELAY)
+		self.fire_timer = rand_range(self.fire_min, self.fire_max)
 		return true
 	end
 	return false
 end
 
 function UFO:is_offscreen()
-	local half_w = UFO_WIDTH * 0.5
+	local half_w = self.width * 0.5
 	if self.dir > 0 then
 		return self.x - half_w > SCREEN_W
 	end
@@ -319,8 +335,8 @@ function UFO:draw()
 	-- lower rhombus (body)
 	local bx = self.x
 	local by = self.y
-	local bhw = UFO_WIDTH * 0.5
-	local bhh = UFO_HEIGHT * 0.5
+	local bhw = self.width * 0.5
+	local bhh = self.height * 0.5
 	local bl = bx - bhw
 	local br = bx + bhw
 	local bt = by - bhh
@@ -332,9 +348,9 @@ function UFO:draw()
 	line(bx + bhw * 0.3, bb, bx - bhw * 0.3, bb, COLOR_UFO)
 	line(bx - bhw * 0.3, bb, bl, by, COLOR_UFO)
 	-- upper rhombus (dome)
-	local dhw = UFO_DOME_WIDTH * 0.5
-	local dhh = UFO_DOME_HEIGHT
-	local dy = by - UFO_DOME_Y_OFFSET
+	local dhw = self.dome_width * 0.5
+	local dhh = self.dome_height
+	local dy = by - self.dome_y_offset
 	local dl = bx - dhw
 	local dr = bx + dhw
 	line(dl, dy, bx, dy - dhh, COLOR_UFO)
@@ -501,7 +517,7 @@ function GameScreen.new()
 end
 
 function GameScreen:get_wave_large_count()
-	return min(MAX_WAVE_ASTEROIDS, ASTEROID_INCREMENT * self.wave_index)
+	return min(MAX_WAVE_ASTEROIDS, INITIAL_WAVE_ASTEROIDS + (ASTEROID_INCREMENT * (self.wave_index-1)))
 end
 
 function GameScreen:spawn_wave(is_initial)
@@ -674,30 +690,35 @@ function GameScreen:try_spawn_ufo()
 	if self.game_over then return end
 	if #self.ufos > 0 then return end
 
+	local small_odds = min(UFO_SMALL_SPAWN_ODDS_MAX, UFO_SMALL_SPAWN_ODDS_BASE + (self.wave_index - 1) * UFO_SMALL_SPAWN_ODDS_PER_WAVE)
+	local is_small = rnd(100) < small_odds
+	local spawn_w = is_small and UFO_SMALL_WIDTH or UFO_WIDTH
+	local spawn_cr = is_small and UFO_SMALL_COLLISION_RADIUS or UFO_COLLISION_RADIUS
+
 	local dir = rnd(1) < 0.5 and 1 or -1
-	local x = dir > 0 and (-UFO_WIDTH) or (SCREEN_W + UFO_WIDTH)
+	local x = dir > 0 and (-spawn_w) or (SCREEN_W + spawn_w)
 	local y = rand_range(UFO_MIN_Y, UFO_MAX_Y)
 
 	local ok = true
 	for i = 1, #self.asteroids do
 		local a = self.asteroids[i]
-		if wrapped_distance(x, y, a.x, a.y) < (UFO_SPAWN_SAFE_DISTANCE + a.radius + UFO_COLLISION_RADIUS) then
+		if wrapped_distance(x, y, a.x, a.y) < (UFO_SPAWN_SAFE_DISTANCE + a.radius + spawn_cr) then
 			ok = false
 			break
 		end
 	end
 
 	if ok and self.ship then
-		if wrapped_distance(x, y, self.ship.x, self.ship.y) < (UFO_SPAWN_SAFE_DISTANCE + UFO_COLLISION_RADIUS + self.ship.radius) then
+		if wrapped_distance(x, y, self.ship.x, self.ship.y) < (UFO_SPAWN_SAFE_DISTANCE + spawn_cr + self.ship.radius) then
 			ok = false
 		end
 	end
 
 	if not ok then return false end
 
-	add(self.ufos, UFO.new(x, y, dir))
+	add(self.ufos, UFO.new(x, y, dir, is_small))
 	self.ufo_spawn_pending = false
-	sfx(SFX_UFO_LOOP, SFX_CHANNEL_UFO, 0, -1)
+	sfx(is_small and SFX_UFO_SMALL_LOOP or SFX_UFO_LOOP, SFX_CHANNEL_UFO, 0, -1)
 	self.ufo_loop_on = true
 	return true
 end
@@ -818,7 +839,7 @@ function GameScreen:resolve_collisions()
 				if wrapped_distance(b.x, b.y, u.x, u.y) <= (b.radius + u.radius) then
 					self:add_explosion(u.x, u.y)
 					sfx(SFX_HIT, SFX_CHANNEL_FX)
-					self:award_points(SCORE_UFO)
+					self:award_points(u.is_small and SCORE_UFO_SMALL or SCORE_UFO)
 					self:remove_ufo(ui)
 					hit = true
 					break
